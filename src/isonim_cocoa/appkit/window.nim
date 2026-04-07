@@ -6,6 +6,12 @@ import isonim_cocoa/appkit/views
 
 {.passL: "-framework AppKit".}
 
+proc cgRect*(x, y, w, h: CGFloat): CGRect =
+  result.origin.x = x
+  result.origin.y = y
+  result.size.width = w
+  result.size.height = h
+
 # ---------------------------------------------------------------------------
 # NSApplication
 # ---------------------------------------------------------------------------

@@ -35,6 +35,7 @@ proc isNil*(x: Id): bool {.inline.} = pointer(x) == nil
 proc isNil*(x: Class): bool {.inline.} = pointer(x) == nil
 proc isNil*(x: Sel): bool {.inline.} = pointer(x) == nil
 proc isNil*(x: Ivar): bool {.inline.} = pointer(x) == nil
+proc isNil*(x: Protocol): bool {.inline.} = pointer(x) == nil
 
 type
   ObjcBool* = bool
