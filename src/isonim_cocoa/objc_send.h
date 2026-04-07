@@ -58,12 +58,18 @@
 /* ---- 1 id + 1 long ---- */
 #define nim_msg_void_id_long ((void(*)(id, SEL, id, long))objc_msgSend)
 
+/* ---- 2 id + 1 long -> id ---- */
+#define nim_msg_id_2id_long  ((id(*)(id, SEL, id, id, long))objc_msgSend)
+
 /* ---- Special: pointer arg (for ivar operations etc.) ---- */
 #define nim_msg_void_1_ptr  ((void(*)(id, SEL, void*))objc_msgSend)
 #define nim_msg_id_1_ptr    ((id(*)(id, SEL, void*))objc_msgSend)
 
 /* ---- 1 extra _Bool arg ---- */
 #define nim_msg_void_1_bool  ((void(*)(id, SEL, _Bool))objc_msgSend)
+
+/* ---- 1 extra int arg ---- */
+#define nim_msg_void_1_int   ((void(*)(id, SEL, int))objc_msgSend)
 
 /* ---- CGRect return (ARM64: returned in registers, use objc_msgSend) ---- */
 #include <CoreGraphics/CGGeometry.h>

@@ -9,6 +9,8 @@ import isonim_cocoa/objc_runtime
 import isonim_cocoa/foundation
 import isonim_cocoa/appkit/views
 import isonim_cocoa/appkit/autolayout
+import isonim_cocoa/appkit/scrollview
+import isonim_cocoa/appkit/tableview
 
 export objc_runtime.Id
 
@@ -34,6 +36,8 @@ type
     ekInput      # NSTextField in editable mode
     ekStack      # NSStackView
     ekImage      # NSImageView
+    ekScroll     # NSScrollView
+    ekVirtualList # NSTableView
     ekLabel      # NSTextField label (for span, p, h1, etc.)
 
   ElementInfo = object
@@ -84,6 +88,10 @@ const tagMap = {
 
   # Media
   "img": ekImage,
+
+  # Scroll & virtualization
+  "scroll-view": ekScroll,
+  "virtual-list": ekVirtualList,
 }.toTable
 
 proc createNativeView(kind: ElementKind; tag: string): CocoaElement =
@@ -104,6 +112,16 @@ proc createNativeView(kind: ElementKind; tag: string): CocoaElement =
   of ekImage:
     result = CocoaElement(newNSImageView())
     setWantsLayer(Id(result))
+  of ekScroll:
+    result = CocoaElement(newNSScrollView())
+  of ekVirtualList:
+    # Create a basic NSTableView with no-op datasource; real datasource
+    # should be attached via setAttribute or direct API.
+    let (table, _) = newNSTableView(
+      proc(): int = 0,
+      proc(row: int): Id = NilId
+    )
+    result = CocoaElement(table)
 
 # ===========================================================================
 # Event callback bridge
@@ -231,6 +249,23 @@ proc applyStyle(elem: CocoaElement; prop, value: string) =
       ((void(*)(id, SEL, double))objc_msgSend)(layer, sel_registerName("setCornerRadius:"), `radius`);
     }
     """.}
+  of "overflow":
+    if inf != nil and inf.kind == ekScroll:
+      case value
+      of "hidden":
+        setHasVerticalScroller(view, false)
+        setHasHorizontalScroller(view, false)
+      of "scroll", "auto":
+        setHasVerticalScroller(view, true)
+        setHasHorizontalScroller(view, true)
+      of "scroll-y":
+        setHasVerticalScroller(view, true)
+        setHasHorizontalScroller(view, false)
+      of "scroll-x":
+        setHasVerticalScroller(view, false)
+        setHasHorizontalScroller(view, true)
+      else:
+        discard
   else:
     discard  # Unknown style property — ignore
 
