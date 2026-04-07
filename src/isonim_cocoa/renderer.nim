@@ -11,6 +11,7 @@ import isonim_cocoa/appkit/views
 import isonim_cocoa/appkit/autolayout
 import isonim_cocoa/appkit/scrollview
 import isonim_cocoa/appkit/tableview
+import isonim_cocoa/appkit/textcontrols
 
 export objc_runtime.Id
 
@@ -39,6 +40,9 @@ type
     ekScroll     # NSScrollView
     ekVirtualList # NSTableView
     ekLabel      # NSTextField label (for span, p, h1, etc.)
+    ekTextArea   # NSTextView (in NSScrollView)
+    ekSearch     # NSSearchField
+    ekSecureInput # NSSecureTextField
 
   ElementInfo = object
     kind: ElementKind
@@ -92,6 +96,10 @@ const tagMap = {
   # Scroll & virtualization
   "scroll-view": ekScroll,
   "virtual-list": ekVirtualList,
+
+  # Rich text & search
+  "textarea": ekTextArea,
+  "search": ekSearch,
 }.toTable
 
 proc createNativeView(kind: ElementKind; tag: string): CocoaElement =
@@ -114,6 +122,15 @@ proc createNativeView(kind: ElementKind; tag: string): CocoaElement =
     setWantsLayer(Id(result))
   of ekScroll:
     result = CocoaElement(newNSScrollView())
+  of ekTextArea:
+    result = CocoaElement(newNSTextView(300, 100))
+    setWantsLayer(Id(result))
+  of ekSearch:
+    result = CocoaElement(newNSSearchField())
+    setWantsLayer(Id(result))
+  of ekSecureInput:
+    result = CocoaElement(newNSSecureTextField())
+    setWantsLayer(Id(result))
   of ekVirtualList:
     # Create a basic NSTableView with no-op datasource; real datasource
     # should be attached via setAttribute or direct API.
@@ -218,7 +235,7 @@ proc applyStyle(elem: CocoaElement; prop, value: string) =
     }
     """.}
   of "color":
-    if inf != nil and inf.kind in {ekText, ekLabel, ekInput}:
+    if inf != nil and inf.kind in {ekText, ekLabel, ekInput, ekSearch, ekSecureInput}:
       let (r, g, b, a) = parseHexColor(value)
       {.emit: """
       id nsColor = ((id(*)(id, SEL, double, double, double, double))objc_msgSend)(
@@ -228,7 +245,7 @@ proc applyStyle(elem: CocoaElement; prop, value: string) =
       ((void(*)(id, SEL, id))objc_msgSend)(`view`, sel_registerName("setTextColor:"), nsColor);
       """.}
   of "font-size":
-    if inf != nil and inf.kind in {ekText, ekLabel, ekInput}:
+    if inf != nil and inf.kind in {ekText, ekLabel, ekInput, ekSearch, ekSecureInput}:
       let size = try: parseFloat(value.replace("px", "").strip()) except: 13.0
       setFontSize(view, size)
   of "flex-direction":
@@ -280,10 +297,15 @@ proc applyAttribute(elem: CocoaElement; name, value: string) =
   of "disabled":
     setEnabled(view, value != "true" and value != "disabled" and value != "")
   of "placeholder":
-    if inf != nil and inf.kind == ekInput:
+    if inf != nil and inf.kind in {ekInput, ekSearch, ekSecureInput}:
       setPlaceholder(view, value)
+  of "type":
+    if inf != nil and inf.kind == ekInput and value == "password":
+      # Convert to secure text field by tracking the type attribute.
+      # The actual NSSecureTextField is created if needed.
+      inf.kind = ekSecureInput
   of "value":
-    if inf != nil and inf.kind in {ekInput, ekLabel, ekText}:
+    if inf != nil and inf.kind in {ekInput, ekLabel, ekText, ekSearch, ekSecureInput}:
       setStringValue(view, value)
   of "hidden":
     setHidden(view, true)
@@ -374,10 +396,13 @@ proc getAttribute*(r: CocoaRenderer; node: CocoaElement; name: string): string =
 
 proc setTextContent*(r: CocoaRenderer; node: CocoaElement; text: string) =
   let inf = info(node)
-  if inf != nil and inf.kind in {ekText, ekLabel, ekInput}:
+  if inf != nil and inf.kind in {ekText, ekLabel, ekInput, ekSearch, ekSecureInput}:
     setStringValue(Id(node), text)
   elif inf != nil and inf.kind == ekButton:
     setButtonTitle(Id(node), text)
+  elif inf != nil and inf.kind == ekTextArea:
+    let tv = textViewFromScroll(Id(node))
+    setTextViewString(tv, text)
 
 proc setStyle*(r: CocoaRenderer; node: CocoaElement; prop, value: string) =
   applyStyle(node, prop, value)
@@ -465,10 +490,12 @@ proc childCount*(r: CocoaRenderer; node: CocoaElement): int =
 
 proc textContent*(r: CocoaRenderer; node: CocoaElement): string =
   let inf = info(node)
-  if inf != nil and inf.kind in {ekText, ekLabel, ekInput}:
+  if inf != nil and inf.kind in {ekText, ekLabel, ekInput, ekSearch, ekSecureInput}:
     stringValue(Id(node))
   elif inf != nil and inf.kind == ekButton:
     buttonTitle(Id(node))
+  elif inf != nil and inf.kind == ekTextArea:
+    textViewString(textViewFromScroll(Id(node)))
   else:
     ""
 
@@ -479,8 +506,10 @@ proc treeTextContent*(r: CocoaRenderer; node: CocoaElement): string =
   if inf == nil:
     return ""
   # Leaf text/label nodes with no children: return their string value directly
-  if inf.kind in {ekText, ekLabel, ekInput} and inf.children.len == 0:
+  if inf.kind in {ekText, ekLabel, ekInput, ekSearch, ekSecureInput} and inf.children.len == 0:
     return stringValue(Id(node))
+  if inf.kind == ekTextArea and inf.children.len == 0:
+    return textViewString(textViewFromScroll(Id(node)))
   # Buttons with no children: return button title
   if inf.kind == ekButton and inf.children.len == 0:
     return buttonTitle(Id(node))
