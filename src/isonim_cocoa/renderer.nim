@@ -17,6 +17,7 @@ import isonim_cocoa/appkit/dialogs
 import isonim_cocoa/appkit/navigation
 import isonim_cocoa/appkit/progress
 import isonim_cocoa/appkit/media
+import isonim_cocoa/appkit/accessibility
 
 export objc_runtime.Id
 
@@ -509,6 +510,33 @@ proc applyAttribute(elem: CocoaElement; name, value: string) =
     if inf != nil and inf.kind == ekMapView:
       let mt = try: parseInt(value) except: 0
       mapViewSetMapType(view, mt)
+  of "aria-label":
+    setAccessibilityLabel(view, value)
+  of "aria-hidden":
+    if value == "true":
+      setAccessibilityElement(view, false)
+    else:
+      setAccessibilityElement(view, true)
+  of "aria-role":
+    let role = case value
+      of "button": accessibilityButtonRole()
+      of "textfield": accessibilityTextFieldRole()
+      of "text", "statictext": accessibilityStaticTextRole()
+      of "group": accessibilityGroupRole()
+      of "image": accessibilityImageRole()
+      of "slider": accessibilitySliderRole()
+      of "checkbox": accessibilityCheckBoxRole()
+      of "list": accessibilityListRole()
+      of "link": accessibilityLinkRole()
+      else: toNSString(value)
+    setAccessibilityRole(view, role)
+  of "aria-valuenow", "aria-valuemin", "aria-valuemax":
+    # Store the value; set accessibilityValue to the "now" value as a string
+    if name == "aria-valuenow":
+      setAccessibilityValue(view, value)
+  of "tabindex":
+    # Mark the view as focusable via accessibility
+    setAccessibilityFocused(view, false)  # ensure it's in the a11y tree
   else:
     discard
 
@@ -526,10 +554,36 @@ proc removeAttributeImpl(elem: CocoaElement; name: string) =
 # RendererBackend — the 13 required procs
 # ===========================================================================
 
+proc setAutoAccessibilityRole(view: Id; kind: ElementKind; tag: string) =
+  ## Set a default accessibility role based on the element kind.
+  case kind
+  of ekButton:
+    setAccessibilityRole(view, accessibilityButtonRole())
+  of ekInput, ekSearch, ekSecureInput, ekTextArea:
+    setAccessibilityRole(view, accessibilityTextFieldRole())
+  of ekLabel, ekText:
+    setAccessibilityRole(view, accessibilityStaticTextRole())
+  of ekView:
+    setAccessibilityRole(view, accessibilityGroupRole())
+  of ekImage:
+    setAccessibilityRole(view, accessibilityImageRole())
+  of ekSlider:
+    setAccessibilityRole(view, accessibilitySliderRole())
+  of ekSwitch:
+    setAccessibilityRole(view, accessibilityCheckBoxRole())
+  of ekStack:
+    if tag in ["ul", "ol"]:
+      setAccessibilityRole(view, accessibilityListRole())
+    else:
+      setAccessibilityRole(view, accessibilityGroupRole())
+  else:
+    discard  # No default role for specialized views
+
 proc createElement*(r: CocoaRenderer; tag: string): CocoaElement =
   let kind = tagMap.getOrDefault(tag, ekView)
   result = createNativeView(kind, tag)
   discard ensureInfo(result, kind, tag)
+  setAutoAccessibilityRole(Id(result), kind, tag)
 
 proc createTextNode*(r: CocoaRenderer; text: string): CocoaElement =
   result = CocoaElement(newNSLabel(text))
