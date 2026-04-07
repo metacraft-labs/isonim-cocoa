@@ -59,30 +59,27 @@ test-all: test test-cross
 xcode-generate:
     xcodegen generate
 
-# Build iOS app for simulator
+# Build iOS app for simulator (env -i avoids Nix linker pollution)
 xcode-build-sim: xcode-generate
-    xcodebuild build \
-      -project IsoNimCocoa.xcodeproj \
-      -scheme IsoNimCocoa \
-      -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
-      -configuration Debug \
-      | tail -20
+    /usr/bin/env -i HOME="$HOME" PATH="/usr/bin:/bin:/usr/sbin:/sbin" \
+      DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
+      /usr/bin/xcodebuild build \
+        -project IsoNimCocoa.xcodeproj \
+        -scheme IsoNimCocoa \
+        -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
+        -configuration Debug \
+        2>&1 | tail -5
 
-# Run XCTests on iOS Simulator
+# Run XCTests on iOS Simulator (env -i avoids Nix linker pollution)
 xcode-test-sim: xcode-generate
-    #!/usr/bin/env bash
-    set -euo pipefail
-    SIM_ID=$(xcrun simctl list devices available | grep "iPhone 17 Pro" | head -1 | grep -oE '[0-9A-F-]{36}')
-    echo "Booting simulator $SIM_ID..."
-    xcrun simctl boot "$SIM_ID" 2>/dev/null || true
-    xcodebuild test \
-      -project IsoNimCocoa.xcodeproj \
-      -scheme IsoNimCocoa \
-      -destination "platform=iOS Simulator,id=$SIM_ID" \
-      -configuration Debug \
-      | tail -30
-    echo "Shutting down simulator..."
-    xcrun simctl shutdown "$SIM_ID" 2>/dev/null || true
+    /usr/bin/env -i HOME="$HOME" PATH="/usr/bin:/bin:/usr/sbin:/sbin" \
+      DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
+      /usr/bin/xcodebuild test \
+        -project IsoNimCocoa.xcodeproj \
+        -scheme IsoNimCocoa \
+        -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
+        -configuration Debug \
+        2>&1 | grep -E "Test Case|Executed|BUILD"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Device deployment
@@ -90,13 +87,15 @@ xcode-test-sim: xcode-generate
 
 # Build iOS app for device (ARM64, signed)
 xcode-build-device: xcode-generate
-    xcodebuild build \
-      -project IsoNimCocoa.xcodeproj \
-      -scheme IsoNimCocoa \
-      -destination 'generic/platform=iOS' \
-      -configuration Debug \
-      CODE_SIGN_IDENTITY="Apple Development" \
-      | tail -20
+    /usr/bin/env -i HOME="$HOME" PATH="/usr/bin:/bin:/usr/sbin:/sbin" \
+      DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
+      /usr/bin/xcodebuild build \
+        -project IsoNimCocoa.xcodeproj \
+        -scheme IsoNimCocoa \
+        -destination 'generic/platform=iOS' \
+        -configuration Debug \
+        CODE_SIGN_IDENTITY="Apple Development" \
+        2>&1 | tail -5
 
 # Deploy to connected iPhone via ios-deploy
 deploy-device: xcode-build-device
@@ -112,13 +111,15 @@ deploy-device: xcode-build-device
 
 # Run XCTests on connected device
 test-device: xcode-generate
-    xcodebuild test \
-      -project IsoNimCocoa.xcodeproj \
-      -scheme IsoNimCocoa \
-      -destination 'platform=iOS,name=iPhone' \
-      -configuration Debug \
-      CODE_SIGN_IDENTITY="Apple Development" \
-      | tail -30
+    /usr/bin/env -i HOME="$HOME" PATH="/usr/bin:/bin:/usr/sbin:/sbin" \
+      DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
+      /usr/bin/xcodebuild test \
+        -project IsoNimCocoa.xcodeproj \
+        -scheme IsoNimCocoa \
+        -destination 'platform=iOS,name=iPhone' \
+        -configuration Debug \
+        CODE_SIGN_IDENTITY="Apple Development" \
+        2>&1 | grep -E "Test Case|Executed|BUILD"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Visual snapshot management

@@ -21,10 +21,6 @@ targets:
       base:
         INFOPLIST_FILE: ios-app/Info.plist
         PRODUCT_BUNDLE_IDENTIFIER: com.metacraft.isonim.cocoa
-        # Link the Nim static library
-        OTHER_LDFLAGS: ["-lnimisonim", "-lobjc"]
-        LIBRARY_SEARCH_PATHS: ["$(PROJECT_DIR)/build/nim-ios"]
-        HEADER_SEARCH_PATHS: ["$(PROJECT_DIR)/src/isonim_cocoa"]
     dependencies: []
 
   IsoNimCocoa-Tests:
