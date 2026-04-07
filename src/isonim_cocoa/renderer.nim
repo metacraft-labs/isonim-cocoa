@@ -16,6 +16,7 @@ import isonim_cocoa/appkit/selectioncontrols
 import isonim_cocoa/appkit/dialogs
 import isonim_cocoa/appkit/navigation
 import isonim_cocoa/appkit/progress
+import isonim_cocoa/appkit/media
 
 export objc_runtime.Id
 
@@ -63,6 +64,9 @@ type
     ekProgress   # NSProgressIndicator (determinate)
     ekSpinner    # NSProgressIndicator (indeterminate)
     ekBadge      # Composite badge view
+    ekWebView    # WKWebView
+    ekVideo      # AVPlayer
+    ekMapView    # MKMapView
 
   ElementInfo = object
     kind: ElementKind
@@ -148,6 +152,11 @@ const tagMap = {
   "progress": ekProgress,
   "spinner": ekSpinner, "activity-indicator": ekSpinner,
   "badge": ekBadge,
+
+  # Web, media & maps
+  "web-view": ekWebView,
+  "video": ekVideo,
+  "map-view": ekMapView,
 }.toTable
 
 proc createNativeView(kind: ElementKind; tag: string): CocoaElement =
@@ -227,6 +236,12 @@ proc createNativeView(kind: ElementKind; tag: string): CocoaElement =
     result = CocoaElement(newNSSpinner())
   of ekBadge:
     result = CocoaElement(newBadge(0))
+  of ekWebView:
+    result = CocoaElement(newWKWebView(300, 300))
+  of ekVideo:
+    result = CocoaElement(newAVPlayer())
+  of ekMapView:
+    result = CocoaElement(newMKMapView())
 
 # ===========================================================================
 # Event callback bridge
@@ -464,6 +479,36 @@ proc applyAttribute(elem: CocoaElement; name, value: string) =
         inf.drawerEdge = deRight
       else:
         inf.drawerEdge = deLeft
+  of "src":
+    if inf != nil:
+      if inf.kind == ekWebView:
+        webViewLoadURL(view, value)
+      elif inf.kind == ekVideo:
+        avPlayerSetURL(view, value)
+  of "html":
+    if inf != nil and inf.kind == ekWebView:
+      webViewLoadHTML(view, value)
+  of "autoplay":
+    if inf != nil and inf.kind == ekVideo:
+      if value == "true":
+        avPlayerPlay(view)
+  of "muted":
+    if inf != nil and inf.kind == ekVideo:
+      avPlayerSetMuted(view, value == "true")
+  of "latitude":
+    if inf != nil and inf.kind == ekMapView:
+      let lat = try: parseFloat(value) except: 0.0
+      let lon = try: parseFloat(inf.attributes.getOrDefault("longitude", "0")) except: 0.0
+      mapViewSetCenter(view, lat, lon)
+  of "longitude":
+    if inf != nil and inf.kind == ekMapView:
+      let lat = try: parseFloat(inf.attributes.getOrDefault("latitude", "0")) except: 0.0
+      let lon = try: parseFloat(value) except: 0.0
+      mapViewSetCenter(view, lat, lon)
+  of "mapType":
+    if inf != nil and inf.kind == ekMapView:
+      let mt = try: parseInt(value) except: 0
+      mapViewSetMapType(view, mt)
   else:
     discard
 
