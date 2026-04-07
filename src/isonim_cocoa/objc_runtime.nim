@@ -138,6 +138,11 @@ proc msgSend*(self: Id; op: Sel; a1: Sel): Id
 proc msgSendBool*(self: Id; op: Sel; a1: Sel): ObjcBool
   {.importc: "nim_msg_bool_1_sel", header: objcSendH.}
 
+# ---- 1 Sel + 1 Id args -> bool (sendAction:to:) ----
+
+proc msgSendBool*(self: Id; op: Sel; a1: Sel; a2: Id): ObjcBool
+  {.importc: "nim_msg_bool_sel_id", header: objcSendH.}
+
 # ---- 1 extra cstring arg ----
 
 proc msgSend*(self: Id; op: Sel; a1: cstring): Id

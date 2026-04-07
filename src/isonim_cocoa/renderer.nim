@@ -12,6 +12,7 @@ import isonim_cocoa/appkit/autolayout
 import isonim_cocoa/appkit/scrollview
 import isonim_cocoa/appkit/tableview
 import isonim_cocoa/appkit/textcontrols
+import isonim_cocoa/appkit/selectioncontrols
 
 export objc_runtime.Id
 
@@ -43,6 +44,12 @@ type
     ekTextArea   # NSTextView (in NSScrollView)
     ekSearch     # NSSearchField
     ekSecureInput # NSSecureTextField
+    ekSwitch     # NSSwitch
+    ekSlider     # NSSlider
+    ekSelect     # NSPopUpButton
+    ekSegmented  # NSSegmentedControl
+    ekDatePicker # NSDatePicker
+    ekStepper    # NSStepper
 
   ElementInfo = object
     kind: ElementKind
@@ -100,6 +107,14 @@ const tagMap = {
   # Rich text & search
   "textarea": ekTextArea,
   "search": ekSearch,
+
+  # Selection controls
+  "switch": ekSwitch, "toggle": ekSwitch,
+  "slider": ekSlider, "range": ekSlider,
+  "select": ekSelect,
+  "segmented": ekSegmented,
+  "date-picker": ekDatePicker,
+  "stepper": ekStepper,
 }.toTable
 
 proc createNativeView(kind: ElementKind; tag: string): CocoaElement =
@@ -139,6 +154,18 @@ proc createNativeView(kind: ElementKind; tag: string): CocoaElement =
       proc(row: int): Id = NilId
     )
     result = CocoaElement(table)
+  of ekSwitch:
+    result = CocoaElement(newNSSwitch())
+  of ekSlider:
+    result = CocoaElement(newNSSlider(0.0, 100.0, 50.0))
+  of ekSelect:
+    result = CocoaElement(newNSPopUpButton(@[]))
+  of ekSegmented:
+    result = CocoaElement(newNSSegmentedControl(@[]))
+  of ekDatePicker:
+    result = CocoaElement(newNSDatePicker())
+  of ekStepper:
+    result = CocoaElement(newNSStepper(0.0, 100.0, 0.0, 1.0))
 
 # ===========================================================================
 # Event callback bridge
@@ -181,7 +208,7 @@ proc ensureCallbackClass() =
                             cast[Imp](callbackAction), "v@:@".cstring)
     objc_registerClassPair(nimCallbackClass)
 
-proc newCallbackTarget(callbackId: int32): Id =
+proc newCallbackTarget*(callbackId: int32): Id =
   ## Create an ObjC object that dispatches to the given callback ID.
   ensureCallbackClass()
   result = msgSend(msgSend(Id(nimCallbackClass), sel("alloc")), sel("init"))
@@ -307,6 +334,36 @@ proc applyAttribute(elem: CocoaElement; name, value: string) =
   of "value":
     if inf != nil and inf.kind in {ekInput, ekLabel, ekText, ekSearch, ekSecureInput}:
       setStringValue(view, value)
+    elif inf != nil and inf.kind == ekSlider:
+      let v = try: parseFloat(value) except: 0.0
+      setSliderValue(view, v)
+    elif inf != nil and inf.kind == ekStepper:
+      let v = try: parseFloat(value) except: 0.0
+      setStepperValue(view, v)
+  of "checked":
+    if inf != nil and inf.kind == ekSwitch:
+      setSwitchState(view, value == "true" or value == "checked")
+  of "min":
+    if inf != nil and inf.kind == ekSlider:
+      let v = try: parseFloat(value) except: 0.0
+      setSliderMin(view, v)
+    elif inf != nil and inf.kind == ekStepper:
+      let v = try: parseFloat(value) except: 0.0
+      msgSendVoid(view, sel("setMinValue:"), v)
+  of "max":
+    if inf != nil and inf.kind == ekSlider:
+      let v = try: parseFloat(value) except: 0.0
+      setSliderMax(view, v)
+    elif inf != nil and inf.kind == ekStepper:
+      let v = try: parseFloat(value) except: 0.0
+      msgSendVoid(view, sel("setMaxValue:"), v)
+  of "selectedIndex":
+    if inf != nil and inf.kind == ekSelect:
+      let idx = try: parseInt(value) except: 0
+      popUpSelectIndex(view, idx)
+    elif inf != nil and inf.kind == ekSegmented:
+      let idx = try: parseInt(value) except: 0
+      segmentSelect(view, idx)
   of "hidden":
     setHidden(view, true)
   else:
@@ -403,6 +460,12 @@ proc setTextContent*(r: CocoaRenderer; node: CocoaElement; text: string) =
   elif inf != nil and inf.kind == ekTextArea:
     let tv = textViewFromScroll(Id(node))
     setTextViewString(tv, text)
+  elif inf != nil and inf.kind == ekSlider:
+    let v = try: parseFloat(text) except: 0.0
+    setSliderValue(Id(node), v)
+  elif inf != nil and inf.kind == ekStepper:
+    let v = try: parseFloat(text) except: 0.0
+    setStepperValue(Id(node), v)
 
 proc setStyle*(r: CocoaRenderer; node: CocoaElement; prop, value: string) =
   applyStyle(node, prop, value)
@@ -428,9 +491,15 @@ proc addEventListener*(r: CocoaRenderer; node: CocoaElement; event: string;
                            target, Id(sel("callbackAction:")))
       msgSendVoid(Id(node), sel("addGestureRecognizer:"), initd)
   of "input", "change":
-    # For NSTextField, delegate-based notification would be needed.
-    # For now, store the callback for later integration.
-    discard
+    # Selection controls use target-action for change events
+    if inf != nil and inf.kind in {ekSwitch, ekSlider, ekSelect, ekSegmented,
+                                     ekDatePicker, ekStepper}:
+      msgSendVoid(Id(node), sel("setTarget:"), target)
+      msgSendVoid(Id(node), sel("setAction:"), Id(sel("callbackAction:")))
+    else:
+      # For NSTextField, delegate-based notification would be needed.
+      # For now, store the callback for later integration.
+      discard
   else:
     discard
 
@@ -496,6 +565,10 @@ proc textContent*(r: CocoaRenderer; node: CocoaElement): string =
     buttonTitle(Id(node))
   elif inf != nil and inf.kind == ekTextArea:
     textViewString(textViewFromScroll(Id(node)))
+  elif inf != nil and inf.kind == ekSlider:
+    $sliderValue(Id(node))
+  elif inf != nil and inf.kind == ekStepper:
+    $stepperValue(Id(node))
   else:
     ""
 

@@ -81,4 +81,7 @@
 /* ---- void with 1 CGFloat arg ---- */
 #define nim_msg_void_1_cgfloat ((void(*)(id, SEL, CGFloat))objc_msgSend)
 
+/* ---- 1 SEL + 1 id args -> _Bool (for sendAction:to:) ---- */
+#define nim_msg_bool_sel_id ((_Bool(*)(id, SEL, SEL, id))objc_msgSend)
+
 #endif /* ISONIM_OBJC_SEND_H */
