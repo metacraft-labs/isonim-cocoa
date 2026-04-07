@@ -1,0 +1,6 @@
+nimcache/
+*.app
+*.ipa
+*.dSYM/
+build/
+.DS_Store
