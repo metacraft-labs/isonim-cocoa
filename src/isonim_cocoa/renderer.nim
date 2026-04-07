@@ -13,6 +13,7 @@ import isonim_cocoa/appkit/scrollview
 import isonim_cocoa/appkit/tableview
 import isonim_cocoa/appkit/textcontrols
 import isonim_cocoa/appkit/selectioncontrols
+import isonim_cocoa/appkit/dialogs
 
 export objc_runtime.Id
 
@@ -50,6 +51,8 @@ type
     ekSegmented  # NSSegmentedControl
     ekDatePicker # NSDatePicker
     ekStepper    # NSStepper
+    ekModal      # Modal container (Nim-side state machine)
+    ekActionSheet # NSMenu-backed action sheet
 
   ElementInfo = object
     kind: ElementKind
@@ -58,6 +61,7 @@ type
     children: seq[CocoaElement]
     attributes: Table[string, string]     # attribute name -> value
     eventCallbacks: Table[string, int32]  # event name -> callback ID
+    modalState: ModalState                # only used for ekModal
 
 var elements: Table[pointer, ElementInfo]
 
@@ -115,6 +119,10 @@ const tagMap = {
   "segmented": ekSegmented,
   "date-picker": ekDatePicker,
   "stepper": ekStepper,
+
+  # Dialogs & modals
+  "modal": ekModal,
+  "action-sheet": ekActionSheet,
 }.toTable
 
 proc createNativeView(kind: ElementKind; tag: string): CocoaElement =
@@ -166,6 +174,14 @@ proc createNativeView(kind: ElementKind; tag: string): CocoaElement =
     result = CocoaElement(newNSDatePicker())
   of ekStepper:
     result = CocoaElement(newNSStepper(0.0, 100.0, 0.0, 1.0))
+  of ekModal:
+    # Modal is a plain NSView container; state is tracked Nim-side
+    result = CocoaElement(allocInit("NSView"))
+    setWantsLayer(Id(result))
+    setHidden(Id(result), true)  # hidden by default
+  of ekActionSheet:
+    # Action sheet backed by an NSMenu
+    result = CocoaElement(newNSMenu())
 
 # ===========================================================================
 # Event callback bridge
@@ -366,6 +382,16 @@ proc applyAttribute(elem: CocoaElement; name, value: string) =
       segmentSelect(view, idx)
   of "hidden":
     setHidden(view, true)
+  of "visible":
+    if inf != nil and inf.kind == ekModal:
+      if value == "true":
+        inf.modalState = msPresenting
+        setHidden(view, false)
+      else:
+        if inf.modalState == msPresenting:
+          inf.modalState = msDismissing
+        inf.modalState = msHidden
+        setHidden(view, true)
   else:
     discard
 
@@ -606,8 +632,17 @@ proc fireEvent*(r: CocoaRenderer; node: CocoaElement; event: string) =
     if cbId in callbackTable:
       callbackTable[cbId]()
 
+proc modalState*(r: CocoaRenderer; node: CocoaElement): ModalState =
+  ## Get the modal state of a modal element.
+  let inf = info(node)
+  if inf != nil:
+    inf.modalState
+  else:
+    msHidden
+
 proc resetTree*() =
   ## Reset all element tracking (for test isolation).
   elements.clear()
   resetCallbacks()
   resetConstraintTracking()
+  resetMenuCallbacks()
