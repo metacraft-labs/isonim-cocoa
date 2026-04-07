@@ -15,6 +15,7 @@ import isonim_cocoa/appkit/textcontrols
 import isonim_cocoa/appkit/selectioncontrols
 import isonim_cocoa/appkit/dialogs
 import isonim_cocoa/appkit/navigation
+import isonim_cocoa/appkit/progress
 
 export objc_runtime.Id
 
@@ -59,6 +60,9 @@ type
     ekToolbar    # NSToolbar (Nim-managed items)
     ekDrawer     # NSView with DrawerState
     ekNavStack   # NSView with NavStackState
+    ekProgress   # NSProgressIndicator (determinate)
+    ekSpinner    # NSProgressIndicator (indeterminate)
+    ekBadge      # Composite badge view
 
   ElementInfo = object
     kind: ElementKind
@@ -139,6 +143,11 @@ const tagMap = {
   "toolbar": ekToolbar,
   "drawer": ekDrawer,
   "nav-stack": ekNavStack,
+
+  # Progress, activity & badges
+  "progress": ekProgress,
+  "spinner": ekSpinner, "activity-indicator": ekSpinner,
+  "badge": ekBadge,
 }.toTable
 
 proc createNativeView(kind: ElementKind; tag: string): CocoaElement =
@@ -212,6 +221,12 @@ proc createNativeView(kind: ElementKind; tag: string): CocoaElement =
   of ekNavStack:
     result = CocoaElement(allocInit("NSView"))
     setWantsLayer(Id(result))
+  of ekProgress:
+    result = CocoaElement(newNSProgressIndicator(determinate = true))
+  of ekSpinner:
+    result = CocoaElement(newNSSpinner())
+  of ekBadge:
+    result = CocoaElement(newBadge(0))
 
 # ===========================================================================
 # Event callback bridge
@@ -386,6 +401,21 @@ proc applyAttribute(elem: CocoaElement; name, value: string) =
     elif inf != nil and inf.kind == ekStepper:
       let v = try: parseFloat(value) except: 0.0
       setStepperValue(view, v)
+    elif inf != nil and inf.kind == ekProgress:
+      let v = try: parseFloat(value) except: 0.0
+      # Interpret as fraction 0..1, scale to maxValue
+      let maxVal = progressMaxValue(view)
+      setProgressValue(view, v * maxVal)
+  of "animating":
+    if inf != nil and inf.kind == ekSpinner:
+      if value == "true":
+        startSpinner(view)
+      else:
+        stopSpinner(view)
+  of "count":
+    if inf != nil and inf.kind == ekBadge:
+      let c = try: parseInt(value) except: 0
+      setBadgeCount(view, c)
   of "checked":
     if inf != nil and inf.kind == ekSwitch:
       setSwitchState(view, value == "true" or value == "checked")
