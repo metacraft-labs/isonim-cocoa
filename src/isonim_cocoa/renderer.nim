@@ -41,6 +41,7 @@ type
     tag: string
     parent: CocoaElement
     children: seq[CocoaElement]
+    attributes: Table[string, string]     # attribute name -> value
     eventCallbacks: Table[string, int32]  # event name -> callback ID
 
 var elements: Table[pointer, ElementInfo]
@@ -317,10 +318,24 @@ proc removeChild*(r: CocoaRenderer; parent, child: CocoaElement) =
     ci.parent = CocoaElement(Id(nil))
 
 proc setAttribute*(r: CocoaRenderer; node: CocoaElement; name, value: string) =
+  let inf = info(node)
+  if inf != nil:
+    inf.attributes[name] = value
   applyAttribute(node, name, value)
 
 proc removeAttribute*(r: CocoaRenderer; node: CocoaElement; name: string) =
+  let inf = info(node)
+  if inf != nil:
+    inf.attributes.del(name)
   removeAttributeImpl(node, name)
+
+proc getAttribute*(r: CocoaRenderer; node: CocoaElement; name: string): string =
+  ## Retrieve a previously-set attribute value by name.
+  let inf = info(node)
+  if inf != nil and name in inf.attributes:
+    inf.attributes[name]
+  else:
+    ""
 
 proc setTextContent*(r: CocoaRenderer; node: CocoaElement; text: string) =
   let inf = info(node)
@@ -421,6 +436,30 @@ proc textContent*(r: CocoaRenderer; node: CocoaElement): string =
     buttonTitle(Id(node))
   else:
     ""
+
+proc treeTextContent*(r: CocoaRenderer; node: CocoaElement): string =
+  ## Recursively collect text content from a node and all descendants,
+  ## matching MockRenderer's textContent semantics.
+  let inf = info(node)
+  if inf == nil:
+    return ""
+  # Leaf text/label nodes with no children: return their string value directly
+  if inf.kind in {ekText, ekLabel, ekInput} and inf.children.len == 0:
+    return stringValue(Id(node))
+  # Buttons with no children: return button title
+  if inf.kind == ekButton and inf.children.len == 0:
+    return buttonTitle(Id(node))
+  # For all nodes with children (including buttons/labels): recurse
+  for child in inf.children:
+    result.add(r.treeTextContent(child))
+
+proc nthChild*(r: CocoaRenderer; node: CocoaElement; index: int): CocoaElement =
+  ## Return the nth child of a node, or nil if out of bounds.
+  let inf = info(node)
+  if inf != nil and index < inf.children.len:
+    inf.children[index]
+  else:
+    CocoaElement(Id(nil))
 
 proc fireEvent*(r: CocoaRenderer; node: CocoaElement; event: string) =
   ## Simulate an event dispatch (for testing without actual UI interaction).
