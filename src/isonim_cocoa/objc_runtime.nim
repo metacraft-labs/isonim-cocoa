@@ -97,7 +97,7 @@ proc sel_getName*(sel: Sel): cstring
 
 {.passL: "-lobjc -framework Foundation".}
 
-const objcSendH = currentSourcePath()[0..^(len("objc_runtime.nim") + 1)] & "objc_send.h"
+const objcSendH* = currentSourcePath()[0..^(len("objc_runtime.nim") + 1)] & "objc_send.h"
 
 # ---- 0 extra args ----
 
@@ -136,16 +136,22 @@ proc msgSendBool*(self: Id; op: Sel; a1: Sel): ObjcBool
 
 proc msgSend*(self: Id; op: Sel; a1: cstring): Id
   {.importc: "nim_msg_id_1_cstr", header: objcSendH.}
+proc msgSendVoid*(self: Id; op: Sel; a1: cstring)
+  {.importc: "nim_msg_void_1_cstr", header: objcSendH.}
 
 # ---- 1 extra long arg ----
 
 proc msgSend*(self: Id; op: Sel; a1: clong): Id
   {.importc: "nim_msg_id_1_long", header: objcSendH.}
+proc msgSendVoid*(self: Id; op: Sel; a1: clong)
+  {.importc: "nim_msg_void_1_long", header: objcSendH.}
 
 # ---- 1 extra double arg ----
 
 proc msgSend*(self: Id; op: Sel; a1: cdouble): Id
   {.importc: "nim_msg_id_1_double", header: objcSendH.}
+proc msgSendVoid*(self: Id; op: Sel; a1: cdouble)
+  {.importc: "nim_msg_void_1_double", header: objcSendH.}
 
 # ---- 2 extra Id args ----
 

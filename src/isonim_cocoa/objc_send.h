@@ -36,11 +36,16 @@
 /* ---- 1 extra cstring arg ---- */
 #define nim_msg_id_1_cstr  ((id(*)(id, SEL, const char*))objc_msgSend)
 
+/* ---- 1 extra cstring arg ---- */
+#define nim_msg_void_1_cstr ((void(*)(id, SEL, const char*))objc_msgSend)
+
 /* ---- 1 extra long arg ---- */
-#define nim_msg_id_1_long  ((id(*)(id, SEL, long))objc_msgSend)
+#define nim_msg_id_1_long   ((id(*)(id, SEL, long))objc_msgSend)
+#define nim_msg_void_1_long ((void(*)(id, SEL, long))objc_msgSend)
 
 /* ---- 1 extra double arg ---- */
-#define nim_msg_id_1_double ((id(*)(id, SEL, double))objc_msgSend)
+#define nim_msg_id_1_double  ((id(*)(id, SEL, double))objc_msgSend)
+#define nim_msg_void_1_double ((void(*)(id, SEL, double))objc_msgSend)
 
 /* ---- 2 extra id args ---- */
 #define nim_msg_id_2     ((id(*)(id, SEL, id, id))objc_msgSend)
