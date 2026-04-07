@@ -8,6 +8,7 @@ import std/[tables, strutils]
 import isonim_cocoa/objc_runtime
 import isonim_cocoa/foundation
 import isonim_cocoa/appkit/views
+import isonim_cocoa/appkit/autolayout
 
 export objc_runtime.Id
 
@@ -157,12 +158,29 @@ proc newCallbackTarget(callbackId: int32): Id =
 
 proc applyStyle(elem: CocoaElement; prop, value: string) =
   let view = Id(elem)
+  let inf = info(elem)
+  let isStack = inf != nil and inf.kind == ekStack
   case prop
   of "display":
     if value == "none":
       setHidden(view, true)
     else:
       setHidden(view, false)
+  of "width", "height":
+    disableAutoresizingMask(view)
+    applyLayoutStyle(view, prop, value, isStack)
+  of "padding":
+    if isStack:
+      applyLayoutStyle(view, prop, value, isStack = true)
+  of "align-items":
+    if isStack:
+      applyLayoutStyle(view, prop, value, isStack = true)
+  of "justify-content":
+    if isStack:
+      applyLayoutStyle(view, prop, value, isStack = true)
+  of "gap":
+    if isStack:
+      applyLayoutStyle(view, prop, value, isStack = true)
   of "background-color":
     setWantsLayer(view)
     let (r, g, b, a) = parseHexColor(value)
@@ -181,7 +199,6 @@ proc applyStyle(elem: CocoaElement; prop, value: string) =
     }
     """.}
   of "color":
-    let inf = info(elem)
     if inf != nil and inf.kind in {ekText, ekLabel, ekInput}:
       let (r, g, b, a) = parseHexColor(value)
       {.emit: """
@@ -192,20 +209,13 @@ proc applyStyle(elem: CocoaElement; prop, value: string) =
       ((void(*)(id, SEL, id))objc_msgSend)(`view`, sel_registerName("setTextColor:"), nsColor);
       """.}
   of "font-size":
-    let inf = info(elem)
     if inf != nil and inf.kind in {ekText, ekLabel, ekInput}:
       let size = try: parseFloat(value.replace("px", "").strip()) except: 13.0
       setFontSize(view, size)
   of "flex-direction":
-    let inf = info(elem)
-    if inf != nil and inf.kind == ekStack:
+    if isStack:
       let horizontal = value in ["row", "row-reverse"]
       setStackOrientation(view, horizontal)
-  of "gap":
-    let inf = info(elem)
-    if inf != nil and inf.kind == ekStack:
-      let spacing = try: parseFloat(value.replace("px", "").strip()) except: 0.0
-      setSpacing(view, spacing)
   of "opacity":
     let alpha = try: parseFloat(value) except: 1.0
     {.emit: """
@@ -424,3 +434,4 @@ proc resetTree*() =
   ## Reset all element tracking (for test isolation).
   elements.clear()
   resetCallbacks()
+  resetConstraintTracking()

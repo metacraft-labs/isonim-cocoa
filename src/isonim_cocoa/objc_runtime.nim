@@ -95,7 +95,12 @@ proc sel_getName*(sel: Sel): cstring
 #   msgSend(obj, sel, a1, a2: Id) -> Id / void
 # etc.
 
-{.passL: "-lobjc -framework Foundation".}
+{.passL: "-lobjc -framework Foundation -framework CoreGraphics".}
+
+{.emit: """
+#include <CoreGraphics/CGGeometry.h>
+#include <objc/message.h>
+""".}
 
 const objcSendH* = currentSourcePath()[0..^(len("objc_runtime.nim") + 1)] & "objc_send.h"
 
@@ -178,6 +183,26 @@ proc msgSendVoid*(self: Id; op: Sel; a1: pointer)
   {.importc: "nim_msg_void_1_ptr", header: objcSendH.}
 proc msgSend*(self: Id; op: Sel; a1: pointer): Id
   {.importc: "nim_msg_id_1_ptr", header: objcSendH.}
+
+# ---- CGRect return (struct returned in registers on ARM64) ----
+
+type
+  CGFloat* = cdouble
+  CGPoint* {.importc: "CGPoint", header: "<CoreGraphics/CGGeometry.h>".} = object
+    x*, y*: CGFloat
+  CGSize* {.importc: "CGSize", header: "<CoreGraphics/CGGeometry.h>".} = object
+    width*, height*: CGFloat
+  CGRect* {.importc: "CGRect", header: "<CoreGraphics/CGGeometry.h>".} = object
+    origin*: CGPoint
+    size*: CGSize
+
+proc msgSendCGRect*(self: Id; op: Sel): CGRect =
+  ## Return a CGRect from an objc_msgSend call.
+  ## On ARM64, CGRect fits in registers so objc_msgSend (not _stret) is used.
+  ## We use emit because Nim's C backend passes struct returns as out params.
+  {.emit: """
+  `result` = ((CGRect(*)(id, SEL))objc_msgSend)((id)`self`, (SEL)`op`);
+  """.}
 
 # ---------------------------------------------------------------------------
 # Runtime functions — dynamic class creation
