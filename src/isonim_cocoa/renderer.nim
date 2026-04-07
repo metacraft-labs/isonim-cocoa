@@ -14,6 +14,7 @@ import isonim_cocoa/appkit/tableview
 import isonim_cocoa/appkit/textcontrols
 import isonim_cocoa/appkit/selectioncontrols
 import isonim_cocoa/appkit/dialogs
+import isonim_cocoa/appkit/navigation
 
 export objc_runtime.Id
 
@@ -53,6 +54,11 @@ type
     ekStepper    # NSStepper
     ekModal      # Modal container (Nim-side state machine)
     ekActionSheet # NSMenu-backed action sheet
+    ekTabView    # NSTabView
+    ekSplitView  # NSSplitView
+    ekToolbar    # NSToolbar (Nim-managed items)
+    ekDrawer     # NSView with DrawerState
+    ekNavStack   # NSView with NavStackState
 
   ElementInfo = object
     kind: ElementKind
@@ -62,6 +68,9 @@ type
     attributes: Table[string, string]     # attribute name -> value
     eventCallbacks: Table[string, int32]  # event name -> callback ID
     modalState: ModalState                # only used for ekModal
+    drawerState: DrawerState              # only used for ekDrawer
+    drawerEdge: DrawerEdge                # only used for ekDrawer
+    navStackState: NavStackState          # only used for ekNavStack
 
 var elements: Table[pointer, ElementInfo]
 
@@ -123,6 +132,13 @@ const tagMap = {
   # Dialogs & modals
   "modal": ekModal,
   "action-sheet": ekActionSheet,
+
+  # Navigation & layout containers
+  "tab-view": ekTabView,
+  "split-view": ekSplitView,
+  "toolbar": ekToolbar,
+  "drawer": ekDrawer,
+  "nav-stack": ekNavStack,
 }.toTable
 
 proc createNativeView(kind: ElementKind; tag: string): CocoaElement =
@@ -182,6 +198,20 @@ proc createNativeView(kind: ElementKind; tag: string): CocoaElement =
   of ekActionSheet:
     # Action sheet backed by an NSMenu
     result = CocoaElement(newNSMenu())
+  of ekTabView:
+    result = CocoaElement(newNSTabView())
+  of ekSplitView:
+    result = CocoaElement(newNSSplitView(vertical = true))
+  of ekToolbar:
+    # Toolbar items are Nim-managed; create a plain NSView as container
+    result = CocoaElement(allocInit("NSView"))
+    setWantsLayer(Id(result))
+  of ekDrawer:
+    result = CocoaElement(allocInit("NSView"))
+    setWantsLayer(Id(result))
+  of ekNavStack:
+    result = CocoaElement(allocInit("NSView"))
+    setWantsLayer(Id(result))
 
 # ===========================================================================
 # Event callback bridge
@@ -392,6 +422,18 @@ proc applyAttribute(elem: CocoaElement; name, value: string) =
           inf.modalState = msDismissing
         inf.modalState = msHidden
         setHidden(view, true)
+  of "open":
+    if inf != nil and inf.kind == ekDrawer:
+      if value == "true":
+        inf.drawerState = dsOpen
+      else:
+        inf.drawerState = dsClosed
+  of "edge":
+    if inf != nil and inf.kind == ekDrawer:
+      if value == "right":
+        inf.drawerEdge = deRight
+      else:
+        inf.drawerEdge = deLeft
   else:
     discard
 
@@ -640,9 +682,83 @@ proc modalState*(r: CocoaRenderer; node: CocoaElement): ModalState =
   else:
     msHidden
 
+proc drawerState*(r: CocoaRenderer; elem: CocoaElement): DrawerState =
+  ## Get the drawer state of a drawer element.
+  let inf = info(elem)
+  if inf != nil:
+    inf.drawerState
+  else:
+    dsClosed
+
+proc drawerEdge*(r: CocoaRenderer; elem: CocoaElement): DrawerEdge =
+  ## Get the drawer edge (left or right).
+  let inf = info(elem)
+  if inf != nil:
+    inf.drawerEdge
+  else:
+    deLeft
+
+proc navStackPush*(r: CocoaRenderer; elem, view: CocoaElement) =
+  ## Push a view onto the nav stack.
+  let inf = info(elem)
+  if inf != nil:
+    inf.navStackState.stack.add(pointer(view))
+    if inf.navStackState.onPush != nil:
+      inf.navStackState.onPush()
+
+proc navStackPop*(r: CocoaRenderer; elem: CocoaElement): CocoaElement =
+  ## Pop the top view off the nav stack and return it.
+  let inf = info(elem)
+  if inf != nil and inf.navStackState.stack.len > 1:
+    let top = inf.navStackState.stack.pop()
+    if inf.navStackState.onPop != nil:
+      inf.navStackState.onPop()
+    CocoaElement(Id(top))
+  else:
+    CocoaElement(Id(nil))
+
+proc navStackPopToRoot*(r: CocoaRenderer; elem: CocoaElement) =
+  ## Pop all views except the root.
+  let inf = info(elem)
+  if inf != nil and inf.navStackState.stack.len > 1:
+    let popCount = inf.navStackState.stack.len - 1
+    inf.navStackState.stack.setLen(1)
+    for _ in 0..<popCount:
+      if inf.navStackState.onPop != nil:
+        inf.navStackState.onPop()
+
+proc navStackDepth*(r: CocoaRenderer; elem: CocoaElement): int =
+  ## Return the number of views in the nav stack.
+  let inf = info(elem)
+  if inf != nil:
+    inf.navStackState.stack.len
+  else:
+    0
+
+proc navStackCurrent*(r: CocoaRenderer; elem: CocoaElement): CocoaElement =
+  ## Return the top (current) view on the nav stack.
+  let inf = info(elem)
+  if inf != nil and inf.navStackState.stack.len > 0:
+    CocoaElement(Id(inf.navStackState.stack[^1]))
+  else:
+    CocoaElement(Id(nil))
+
+proc navStackSetOnPush*(r: CocoaRenderer; elem: CocoaElement; cb: proc()) =
+  ## Set the onPush callback for a nav stack.
+  let inf = info(elem)
+  if inf != nil:
+    inf.navStackState.onPush = cb
+
+proc navStackSetOnPop*(r: CocoaRenderer; elem: CocoaElement; cb: proc()) =
+  ## Set the onPop callback for a nav stack.
+  let inf = info(elem)
+  if inf != nil:
+    inf.navStackState.onPop = cb
+
 proc resetTree*() =
   ## Reset all element tracking (for test isolation).
   elements.clear()
   resetCallbacks()
   resetConstraintTracking()
   resetMenuCallbacks()
+  resetToolbarItems()

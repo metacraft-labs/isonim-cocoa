@@ -188,6 +188,11 @@ proc msgSendVoid*(self: Id; op: Sel; a1: Id; a2: clong)
 proc msgSend*(self: Id; op: Sel; a1, a2: Id; a3: clong): Id
   {.importc: "nim_msg_id_2id_long", header: objcSendH.}
 
+# ---- 1 double + 1 long ----
+
+proc msgSendVoid*(self: Id; op: Sel; a1: cdouble; a2: clong)
+  {.importc: "nim_msg_void_double_long", header: objcSendH.}
+
 # ---- 1 pointer arg ----
 
 proc msgSendVoid*(self: Id; op: Sel; a1: pointer)
