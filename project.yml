@@ -1,0 +1,51 @@
+name: IsoNimCocoa
+options:
+  bundleIdPrefix: com.metacraft.isonim
+  deploymentTarget:
+    iOS: "17.0"
+    macOS: "14.0"
+  xcodeVersion: "16.0"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    DEVELOPMENT_TEAM: P23728WCHN
+
+targets:
+  IsoNimCocoa-iOS:
+    type: application
+    platform: iOS
+    sources:
+      - path: ios-app/Sources
+    settings:
+      base:
+        INFOPLIST_FILE: ios-app/Info.plist
+        PRODUCT_BUNDLE_IDENTIFIER: com.metacraft.isonim.cocoa
+        # Link the Nim static library
+        OTHER_LDFLAGS: ["-lnimisonim", "-lobjc"]
+        LIBRARY_SEARCH_PATHS: ["$(PROJECT_DIR)/build/nim-ios"]
+        HEADER_SEARCH_PATHS: ["$(PROJECT_DIR)/src/isonim_cocoa"]
+    dependencies: []
+
+  IsoNimCocoa-Tests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: ios-app/Tests
+    settings:
+      base:
+        INFOPLIST_FILE: ios-app/Tests/Info.plist
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/IsoNimCocoa-iOS.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/IsoNimCocoa-iOS"
+        BUNDLE_LOADER: "$(TEST_HOST)"
+    dependencies:
+      - target: IsoNimCocoa-iOS
+
+schemes:
+  IsoNimCocoa:
+    build:
+      targets:
+        IsoNimCocoa-iOS: all
+        IsoNimCocoa-Tests: [test]
+    test:
+      targets:
+        - IsoNimCocoa-Tests

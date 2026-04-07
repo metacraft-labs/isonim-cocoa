@@ -2,37 +2,141 @@
 
 set shell := ["bash", "-euo", "pipefail", "-c"]
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Environment
+# ─────────────────────────────────────────────────────────────────────────────
+
 # Verify dev environment prerequisites
 verify-env:
     #!/usr/bin/env bash
     set -e
     echo "Nim:        $(nim --version | head -1)"
-    echo "Xcode:      $(xcodebuild -version 2>/dev/null | head -1 || echo 'NOT FOUND — install from App Store')"
-    echo "xcrun:      $(xcrun --version 2>/dev/null || echo 'NOT FOUND — run xcode-select --install')"
+    echo "Xcode:      $(xcodebuild -version 2>/dev/null | head -1 || echo 'NOT FOUND')"
+    echo "XcodeGen:   $(xcodegen version 2>/dev/null || echo 'NOT FOUND')"
+    echo "ios-deploy: $(ios-deploy --version 2>/dev/null || echo 'NOT FOUND')"
     echo "clang:      $(clang --version 2>/dev/null | head -1)"
     echo "macOS SDK:  $(xcrun --sdk macosx --show-sdk-path 2>/dev/null || echo 'NOT FOUND')"
     echo "iOS SDK:    $(xcrun --sdk iphonesimulator --show-sdk-path 2>/dev/null || echo 'NOT FOUND')"
-    echo "Simulators: $(xcrun simctl list devices available 2>/dev/null | grep -c 'iPhone' || echo '0') iPhone simulators available"
-    echo "Testing objc_msgSend availability..."
-    echo 'proc objc_getClass(name: cstring): pointer {.importc, header: "<objc/runtime.h>".}' > /tmp/test_objc.nim
-    echo 'discard objc_getClass("NSObject")' >> /tmp/test_objc.nim
-    nim c -r /tmp/test_objc.nim 2>/dev/null && echo "ObjC runtime: OK" || echo "ObjC runtime: FAILED"
+    echo "Simulators: $(xcrun simctl list devices available 2>/dev/null | grep -c 'iPhone' || echo '0') available"
+    echo "Devices:    $(xcrun xctrace list devices 2>/dev/null | grep -c 'iPhone (' || echo '0') connected"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Nim tests (headless, no Xcode needed)
+# ─────────────────────────────────────────────────────────────────────────────
 
 # Run ObjC runtime tests (M0)
 test-objc:
     nim c -r --nimcache:nimcache/test_objc_runtime tests/test_objc_runtime.nim
 
-# Run renderer tests
-test:
+# Run AppKit view tests (M1)
+test-views:
+    nim c -r --nimcache:nimcache/test_appkit_views tests/test_appkit_views.nim
+
+# Run renderer tests (M2)
+test-renderer:
     nim c -r --nimcache:nimcache/test_renderer tests/test_renderer.nim
+
+# Run test infrastructure tests (FakeClock, snapshots)
+test-infra:
+    nim c -r --nimcache:nimcache/test_fake_clock tests/test_fake_clock.nim
+    nim c -r --nimcache:nimcache/test_snapshots tests/test_snapshots.nim
 
 # Run cross-renderer tests (requires isonim core as sibling)
 test-cross:
     nim c -r --path:../isonim/src --nimcache:nimcache/test_cross_renderer tests/test_cross_renderer.nim
 
-# Run all tests
-test-all: test-objc test test-cross
+# Run all headless Nim tests
+test: test-objc test-views test-renderer test-infra
 
-# Clean build artifacts
+# Run all tests including cross-renderer
+test-all: test test-cross
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Xcode project (generated via XcodeGen)
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Generate Xcode project from project.yml
+xcode-generate:
+    xcodegen generate
+
+# Build iOS app for simulator
+xcode-build-sim: xcode-generate
+    xcodebuild build \
+      -project IsoNimCocoa.xcodeproj \
+      -scheme IsoNimCocoa \
+      -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
+      -configuration Debug \
+      | tail -20
+
+# Run XCTests on iOS Simulator
+xcode-test-sim: xcode-generate
+    #!/usr/bin/env bash
+    set -euo pipefail
+    SIM_ID=$(xcrun simctl list devices available | grep "iPhone 17 Pro" | head -1 | grep -oE '[0-9A-F-]{36}')
+    echo "Booting simulator $SIM_ID..."
+    xcrun simctl boot "$SIM_ID" 2>/dev/null || true
+    xcodebuild test \
+      -project IsoNimCocoa.xcodeproj \
+      -scheme IsoNimCocoa \
+      -destination "platform=iOS Simulator,id=$SIM_ID" \
+      -configuration Debug \
+      | tail -30
+    echo "Shutting down simulator..."
+    xcrun simctl shutdown "$SIM_ID" 2>/dev/null || true
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Device deployment
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Build iOS app for device (ARM64, signed)
+xcode-build-device: xcode-generate
+    xcodebuild build \
+      -project IsoNimCocoa.xcodeproj \
+      -scheme IsoNimCocoa \
+      -destination 'generic/platform=iOS' \
+      -configuration Debug \
+      CODE_SIGN_IDENTITY="Apple Development" \
+      | tail -20
+
+# Deploy to connected iPhone via ios-deploy
+deploy-device: xcode-build-device
+    #!/usr/bin/env bash
+    set -euo pipefail
+    APP_PATH=$(find ~/Library/Developer/Xcode/DerivedData -name "IsoNimCocoa-iOS.app" -path "*/Debug-iphoneos/*" | head -1)
+    if [ -z "$APP_PATH" ]; then
+      echo "Error: .app not found. Run 'just xcode-build-device' first."
+      exit 1
+    fi
+    echo "Deploying $APP_PATH..."
+    ios-deploy --bundle "$APP_PATH"
+
+# Run XCTests on connected device
+test-device: xcode-generate
+    xcodebuild test \
+      -project IsoNimCocoa.xcodeproj \
+      -scheme IsoNimCocoa \
+      -destination 'platform=iOS,name=iPhone' \
+      -configuration Debug \
+      CODE_SIGN_IDENTITY="Apple Development" \
+      | tail -30
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Visual snapshot management
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Update all golden snapshots (run after intentional visual changes)
+snapshot-update:
+    rm -rf tests/golden/*.png
+    nim c -r --nimcache:nimcache/test_snapshots tests/test_snapshots.nim
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Clean
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Clean all build artifacts
 clean:
-    rm -rf nimcache/ tests/test_objc_runtime tests/test_renderer tests/test_cross_renderer
+    rm -rf nimcache/ tests/test_* !tests/test_*.nim IsoNimCocoa.xcodeproj build/
+
+# Clean only Nim build artifacts
+clean-nim:
+    rm -rf nimcache/

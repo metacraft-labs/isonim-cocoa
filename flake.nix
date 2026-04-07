@@ -29,11 +29,19 @@
             ++ pkgs.lib.optionals isDarwin (
               with pkgs.darwin.apple_sdk.frameworks;
               [
+                # Frameworks
                 AppKit
                 Foundation
                 CoreGraphics
                 CoreText
                 QuartzCore
+                WebKit
+                AVKit
+                MapKit
+
+                # iOS device deployment & Xcode project generation
+                pkgs.ios-deploy
+                pkgs.xcodegen
               ]
             );
 
