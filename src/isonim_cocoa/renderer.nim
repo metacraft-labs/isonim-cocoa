@@ -303,7 +303,7 @@ proc resolveStyleValue*(prop, value: string): string =
   ## For spacing/radius properties, try numeric theme lookup.
   ## Returns the original value if no theme resolution applies.
   case prop
-  of "background-color", "color":
+  of "background-color", "color", "border-color":
     let themed = themeColor(value)
     if themed != "": themed else: value
   of "padding", "margin", "gap":
@@ -388,6 +388,21 @@ proc applyStyle(elem: CocoaElement; prop, value: string) =
     id layer = ((id(*)(id, SEL))objc_msgSend)(`view`, sel_registerName("layer"));
     if (layer) {
       ((void(*)(id, SEL, double))objc_msgSend)(layer, sel_registerName("setCornerRadius:"), `radius`);
+    }
+    """.}
+  of "border-color":
+    setWantsLayer(view)
+    let (r, g, b, a) = parseHexColor(resolved)
+    {.emit: """
+    id nsColor = ((id(*)(id, SEL, double, double, double, double))objc_msgSend)(
+      (id)objc_getClass("NSColor"),
+      sel_registerName("colorWithRed:green:blue:alpha:"),
+      `r`, `g`, `b`, `a`);
+    id layer = ((id(*)(id, SEL))objc_msgSend)(`view`, sel_registerName("layer"));
+    if (layer) {
+      void* cgColor = ((void*(*)(id, SEL))objc_msgSend)(nsColor, sel_registerName("CGColor"));
+      ((void(*)(id, SEL, void*))objc_msgSend)(layer, sel_registerName("setBorderColor:"), cgColor);
+      ((void(*)(id, SEL, double))objc_msgSend)(layer, sel_registerName("setBorderWidth:"), 1.5);
     }
     """.}
   of "overflow":

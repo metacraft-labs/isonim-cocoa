@@ -125,7 +125,9 @@ proc nsDictRemoveObjectForKey*(dict: Id; key: Id) =
 
 proc parseHexColor*(hex: string): tuple[r, g, b, a: cdouble] =
   ## Parse a CSS hex color string to normalized RGBA (0.0-1.0).
-  ## Supports #RGB, #RGBA, #RRGGBB, #RRGGBBAA.
+  ## Supports #RGB, #RGBA, #RRGGBB, #RRGGBBAA, and "transparent".
+  if hex == "transparent":
+    return (0.0, 0.0, 0.0, 0.0)
   var s = hex
   if s.len > 0 and s[0] == '#':
     s = s[1..^1]
