@@ -45,11 +45,15 @@ test-infra:
 test-cross:
     nim c -r --path:../isonim/src --nimcache:nimcache/test_cross_renderer tests/test_cross_renderer.nim
 
+# Render all branded scenario snapshots (creates/compares golden files)
+test-scenarios:
+    nim c -r --nimcache:nimcache/test_scenarios tests/test_scenario_snapshots.nim
+
 # Run all headless Nim tests
 test: test-objc test-views test-renderer test-infra
 
-# Run all tests including cross-renderer
-test-all: test test-cross
+# Run all tests including cross-renderer and scenarios
+test-all: test test-cross test-scenarios
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Xcode project (generated via XcodeGen)
