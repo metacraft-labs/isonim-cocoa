@@ -328,6 +328,10 @@ class TaskManagerViewController: UIViewController {
         inputField.layer.cornerRadius = BrandedDimensions.buttonRadius
         inputField.font = .systemFont(ofSize: BrandedDimensions.bodyFontSize)
         inputField.textColor = AppTheme.current.textPrimary
+        inputField.attributedPlaceholder = NSAttributedString(
+            string: "What needs to be done?",
+            attributes: [.foregroundColor: AppTheme.current.textSecondary]
+        )
         inputField.leftView = UIView(frame: CGRect(x: 0, y: 0, width: BrandedDimensions.innerPadding, height: 0))
         inputField.leftViewMode = .always
         inputField.rightView = UIView(frame: CGRect(x: 0, y: 0, width: BrandedDimensions.innerPadding, height: 0))
