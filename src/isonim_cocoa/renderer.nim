@@ -7,6 +7,7 @@
 import std/[tables, strutils]
 import isonim_cocoa/objc_runtime
 import isonim_cocoa/foundation
+import isonim/theming/theme
 import isonim_cocoa/appkit/views
 import isonim_cocoa/appkit/autolayout
 import isonim_cocoa/appkit/scrollview
@@ -296,7 +297,26 @@ proc newCallbackTarget*(callbackId: int32): Id =
 # Style property mapping
 # ===========================================================================
 
+proc resolveStyleValue*(prop, value: string): string =
+  ## Resolve semantic theme tokens to concrete values.
+  ## For color properties, try themeColor lookup.
+  ## For spacing/radius properties, try numeric theme lookup.
+  ## Returns the original value if no theme resolution applies.
+  case prop
+  of "background-color", "color":
+    let themed = themeColor(value)
+    if themed != "": themed else: value
+  of "padding", "margin", "gap":
+    let sp = themeSpacing(value)
+    if sp >= 0: $sp else: value
+  of "border-radius":
+    let r = themeRadius(value)
+    if r >= 0: $r else: value
+  else:
+    value
+
 proc applyStyle(elem: CocoaElement; prop, value: string) =
+  let resolved = resolveStyleValue(prop, value)
   let view = Id(elem)
   let inf = info(elem)
   let isStack = inf != nil and inf.kind == ekStack
@@ -311,7 +331,7 @@ proc applyStyle(elem: CocoaElement; prop, value: string) =
     applyLayoutStyle(view, prop, value, isStack)
   of "padding":
     if isStack:
-      applyLayoutStyle(view, prop, value, isStack = true)
+      applyLayoutStyle(view, prop, resolved, isStack = true)
   of "align-items":
     if isStack:
       applyLayoutStyle(view, prop, value, isStack = true)
@@ -320,10 +340,10 @@ proc applyStyle(elem: CocoaElement; prop, value: string) =
       applyLayoutStyle(view, prop, value, isStack = true)
   of "gap":
     if isStack:
-      applyLayoutStyle(view, prop, value, isStack = true)
+      applyLayoutStyle(view, prop, resolved, isStack = true)
   of "background-color":
     setWantsLayer(view)
-    let (r, g, b, a) = parseHexColor(value)
+    let (r, g, b, a) = parseHexColor(resolved)
     # Create CGColor and set on layer
     let colorSpace = msgSend(Id(cls("NSColorSpace")), sel("sRGBColorSpace"))
     # Use NSColor then get CGColor
@@ -340,7 +360,7 @@ proc applyStyle(elem: CocoaElement; prop, value: string) =
     """.}
   of "color":
     if inf != nil and inf.kind in {ekText, ekLabel, ekInput, ekSearch, ekSecureInput}:
-      let (r, g, b, a) = parseHexColor(value)
+      let (r, g, b, a) = parseHexColor(resolved)
       {.emit: """
       id nsColor = ((id(*)(id, SEL, double, double, double, double))objc_msgSend)(
         (id)objc_getClass("NSColor"),
@@ -363,7 +383,7 @@ proc applyStyle(elem: CocoaElement; prop, value: string) =
     """.}
   of "border-radius":
     setWantsLayer(view)
-    let radius = try: parseFloat(value.replace("px", "").strip()) except: 0.0
+    let radius = try: parseFloat(resolved.replace("px", "").strip()) except: 0.0
     {.emit: """
     id layer = ((id(*)(id, SEL))objc_msgSend)(`view`, sel_registerName("layer"));
     if (layer) {
