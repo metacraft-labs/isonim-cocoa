@@ -1,5 +1,42 @@
 import UIKit
 
+// MARK: - App Theme
+
+struct AppTheme {
+    let primary: UIColor
+    let background: UIColor
+    let surface: UIColor
+    let textPrimary: UIColor
+    let textSecondary: UIColor
+    let error: UIColor
+    let border: UIColor
+    let inputBackground: UIColor
+
+    #if THEME_BRANDED
+    static let current = AppTheme(
+        primary: UIColor(red: 0x63/255.0, green: 0x66/255.0, blue: 0xF1/255.0, alpha: 1),     // #6366F1
+        background: UIColor(red: 0xF8/255.0, green: 0xFA/255.0, blue: 0xFC/255.0, alpha: 1),   // #F8FAFC
+        surface: .white,
+        textPrimary: UIColor(red: 0x0F/255.0, green: 0x17/255.0, blue: 0x2A/255.0, alpha: 1),  // #0F172A
+        textSecondary: UIColor(red: 0x64/255.0, green: 0x74/255.0, blue: 0x8B/255.0, alpha: 1),// #64748B
+        error: UIColor(red: 0xEF/255.0, green: 0x44/255.0, blue: 0x44/255.0, alpha: 1),        // #EF4444
+        border: UIColor(red: 0xE2/255.0, green: 0xE8/255.0, blue: 0xF0/255.0, alpha: 1),       // #E2E8F0
+        inputBackground: UIColor(red: 0xF1/255.0, green: 0xF5/255.0, blue: 0xF9/255.0, alpha: 1) // #F1F5F9
+    )
+    #else
+    static let current = AppTheme(
+        primary: .systemBlue,
+        background: .systemGroupedBackground,
+        surface: .systemBackground,
+        textPrimary: .label,
+        textSecondary: .secondaryLabel,
+        error: .systemRed,
+        border: .separator,
+        inputBackground: .secondarySystemBackground
+    )
+    #endif
+}
+
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
@@ -66,7 +103,7 @@ class TaskCell: UITableViewCell {
     private func setupViews() {
         checkButton.translatesAutoresizingMaskIntoConstraints = false
         checkButton.addTarget(self, action: #selector(toggleTapped), for: .touchUpInside)
-        checkButton.tintColor = .systemBlue
+        checkButton.tintColor = AppTheme.current.primary
         contentView.addSubview(checkButton)
 
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
@@ -76,7 +113,7 @@ class TaskCell: UITableViewCell {
 
         deleteButton.translatesAutoresizingMaskIntoConstraints = false
         deleteButton.setImage(UIImage(systemName: "trash"), for: .normal)
-        deleteButton.tintColor = .systemRed
+        deleteButton.tintColor = AppTheme.current.error
         deleteButton.addTarget(self, action: #selector(deleteTapped), for: .touchUpInside)
         contentView.addSubview(deleteButton)
 
@@ -102,17 +139,17 @@ class TaskCell: UITableViewCell {
         titleLabel.text = task.title
         let iconName = task.isCompleted ? "checkmark.circle.fill" : "circle"
         checkButton.setImage(UIImage(systemName: iconName), for: .normal)
-        checkButton.tintColor = task.isCompleted ? .systemGreen : .systemGray
+        checkButton.tintColor = task.isCompleted ? .systemGreen : AppTheme.current.textSecondary
 
         if task.isCompleted {
-            titleLabel.textColor = .secondaryLabel
+            titleLabel.textColor = AppTheme.current.textSecondary
             titleLabel.attributedText = NSAttributedString(
                 string: task.title,
                 attributes: [.strikethroughStyle: NSUnderlineStyle.single.rawValue,
-                             .foregroundColor: UIColor.secondaryLabel]
+                             .foregroundColor: AppTheme.current.textSecondary]
             )
         } else {
-            titleLabel.textColor = .label
+            titleLabel.textColor = AppTheme.current.textPrimary
             titleLabel.attributedText = nil
             titleLabel.text = task.title
         }
@@ -146,7 +183,7 @@ class TaskManagerViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         title = "Tasks"
-        view.backgroundColor = .systemGroupedBackground
+        view.backgroundColor = AppTheme.current.background
         navigationController?.navigationBar.prefersLargeTitles = true
         setupInputBar()
         setupTableView()
@@ -159,13 +196,13 @@ class TaskManagerViewController: UIViewController {
     private func setupInputBar() {
         let container = UIView()
         container.translatesAutoresizingMaskIntoConstraints = false
-        container.backgroundColor = .systemBackground
+        container.backgroundColor = AppTheme.current.surface
         view.addSubview(container)
 
         inputField.translatesAutoresizingMaskIntoConstraints = false
         inputField.placeholder = "What needs to be done?"
         inputField.borderStyle = .none
-        inputField.backgroundColor = .secondarySystemBackground
+        inputField.backgroundColor = AppTheme.current.inputBackground
         inputField.layer.cornerRadius = 10
         inputField.leftView = UIView(frame: CGRect(x: 0, y: 0, width: 12, height: 0))
         inputField.leftViewMode = .always
@@ -177,7 +214,7 @@ class TaskManagerViewController: UIViewController {
 
         addButton.translatesAutoresizingMaskIntoConstraints = false
         addButton.setImage(UIImage(systemName: "plus.circle.fill"), for: .normal)
-        addButton.tintColor = .systemBlue
+        addButton.tintColor = AppTheme.current.primary
         addButton.contentVerticalAlignment = .fill
         addButton.contentHorizontalAlignment = .fill
         addButton.addTarget(self, action: #selector(addTask), for: .touchUpInside)
@@ -185,7 +222,7 @@ class TaskManagerViewController: UIViewController {
 
         let separator = UIView()
         separator.translatesAutoresizingMaskIntoConstraints = false
-        separator.backgroundColor = .separator
+        separator.backgroundColor = AppTheme.current.border
         container.addSubview(separator)
 
         NSLayoutConstraint.activate([
@@ -218,7 +255,7 @@ class TaskManagerViewController: UIViewController {
 
     private func setupTableView() {
         tableView.translatesAutoresizingMaskIntoConstraints = false
-        tableView.backgroundColor = .systemGroupedBackground
+        tableView.backgroundColor = AppTheme.current.background
         tableView.register(TaskCell.self, forCellReuseIdentifier: TaskCell.reuseID)
         tableView.dataSource = self
         tableView.delegate = self
@@ -252,12 +289,12 @@ class TaskManagerViewController: UIViewController {
     private func setupBottomBar() {
         let bottomContainer = UIView()
         bottomContainer.translatesAutoresizingMaskIntoConstraints = false
-        bottomContainer.backgroundColor = .systemBackground
+        bottomContainer.backgroundColor = AppTheme.current.surface
         view.addSubview(bottomContainer)
 
         let topSep = UIView()
         topSep.translatesAutoresizingMaskIntoConstraints = false
-        topSep.backgroundColor = .separator
+        topSep.backgroundColor = AppTheme.current.border
         bottomContainer.addSubview(topSep)
 
         filterControl.translatesAutoresizingMaskIntoConstraints = false
@@ -268,7 +305,7 @@ class TaskManagerViewController: UIViewController {
         clearButton.translatesAutoresizingMaskIntoConstraints = false
         clearButton.setTitle("Clear Completed", for: .normal)
         clearButton.titleLabel?.font = .preferredFont(forTextStyle: .footnote)
-        clearButton.tintColor = .systemRed
+        clearButton.tintColor = AppTheme.current.error
         clearButton.addTarget(self, action: #selector(clearCompleted), for: .touchUpInside)
         bottomContainer.addSubview(clearButton)
 

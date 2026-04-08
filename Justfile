@@ -65,7 +65,7 @@ xcode-build-sim: xcode-generate
       DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
       /usr/bin/xcodebuild build \
         -project IsoNimCocoa.xcodeproj \
-        -scheme IsoNimCocoa \
+        -scheme Native \
         -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
         -configuration Debug \
         2>&1 | tail -5
@@ -76,7 +76,7 @@ xcode-test-sim: xcode-generate
       DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
       /usr/bin/xcodebuild test \
         -project IsoNimCocoa.xcodeproj \
-        -scheme IsoNimCocoa \
+        -scheme Native \
         -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
         -configuration Debug \
         2>&1 | grep -E "Test Case|Executed|BUILD"
@@ -91,7 +91,7 @@ xcode-build-device: xcode-generate
       DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
       /usr/bin/xcodebuild build \
         -project IsoNimCocoa.xcodeproj \
-        -scheme IsoNimCocoa \
+        -scheme Native \
         -destination 'generic/platform=iOS' \
         -configuration Debug \
         CODE_SIGN_IDENTITY="Apple Development" \
@@ -101,7 +101,7 @@ xcode-build-device: xcode-generate
 deploy-device: xcode-build-device
     #!/usr/bin/env bash
     set -euo pipefail
-    APP_PATH=$(find ~/Library/Developer/Xcode/DerivedData -name "IsoNimCocoa-iOS.app" -path "*/Debug-iphoneos/*" | head -1)
+    APP_PATH=$(find ~/Library/Developer/Xcode/DerivedData -name "Tasks Native.app" -path "*/Debug-iphoneos/*" | head -1)
     if [ -z "$APP_PATH" ]; then
       echo "Error: .app not found. Run 'just xcode-build-device' first."
       exit 1
@@ -109,7 +109,7 @@ deploy-device: xcode-build-device
     echo "Deploying $APP_PATH..."
     ios-deploy --bundle "$APP_PATH"
 
-# Deploy app to connected iPhone (with team provisioning)
+# Deploy app to connected iPhone (native variant, with team provisioning)
 deploy-iphone: xcode-generate
     #!/usr/bin/env bash
     set -euo pipefail
@@ -118,15 +118,56 @@ deploy-iphone: xcode-generate
       DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
       /usr/bin/xcodebuild build \
         -project IsoNimCocoa.xcodeproj \
-        -target IsoNimCocoa-iOS \
+        -target IsoNimCocoa-Native \
         -configuration Debug \
         DEVELOPMENT_TEAM=GK3D7BH967 \
         -destination 'generic/platform=iOS' \
         -allowProvisioningUpdates 2>&1 | tail -3
-    APP=$(find build -name "IsoNimCocoa-iOS.app" -path "*/Debug-iphoneos/*" | head -1)
+    APP=$(find build -name "Tasks Native.app" -path "*/Debug-iphoneos/*" | head -1)
     echo "Installing $APP..."
     ios-deploy --bundle "$APP" --justlaunch 2>&1 | tail -3
     echo "Done — app should be running on iPhone"
+
+# Deploy native-themed app to iPhone
+deploy-native: xcode-generate
+    #!/usr/bin/env bash
+    set -euo pipefail
+    /usr/bin/env -i HOME="$HOME" USER="$USER" TMPDIR="${TMPDIR:-/tmp}" \
+      PATH="/usr/bin:/bin:/usr/sbin:/sbin" \
+      DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
+      /usr/bin/xcodebuild build \
+        -project IsoNimCocoa.xcodeproj \
+        -target IsoNimCocoa-Native \
+        -configuration Debug \
+        DEVELOPMENT_TEAM=GK3D7BH967 \
+        -destination 'generic/platform=iOS' \
+        -allowProvisioningUpdates 2>&1 | tail -3
+    APP=$(find build -name "Tasks Native.app" -path "*/Debug-iphoneos/*" | head -1)
+    echo "Installing $APP..."
+    ios-deploy --bundle "$APP" --justlaunch 2>&1 | tail -3
+    echo "Native app deployed"
+
+# Deploy branded (IsoNim theme) app to iPhone
+deploy-branded: xcode-generate
+    #!/usr/bin/env bash
+    set -euo pipefail
+    /usr/bin/env -i HOME="$HOME" USER="$USER" TMPDIR="${TMPDIR:-/tmp}" \
+      PATH="/usr/bin:/bin:/usr/sbin:/sbin" \
+      DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
+      /usr/bin/xcodebuild build \
+        -project IsoNimCocoa.xcodeproj \
+        -target IsoNimCocoa-Branded \
+        -configuration Debug \
+        DEVELOPMENT_TEAM=GK3D7BH967 \
+        -destination 'generic/platform=iOS' \
+        -allowProvisioningUpdates 2>&1 | tail -3
+    APP=$(find build -name "Tasks IsoNim.app" -path "*/Debug-iphoneos/*" | head -1)
+    echo "Installing $APP..."
+    ios-deploy --bundle "$APP" --justlaunch 2>&1 | tail -3
+    echo "Branded app deployed"
+
+# Deploy both variants to iPhone
+deploy-both: deploy-native deploy-branded
 
 # Run XCTests on connected device
 test-device: xcode-generate
@@ -135,7 +176,7 @@ test-device: xcode-generate
       DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
       /usr/bin/xcodebuild test \
         -project IsoNimCocoa.xcodeproj \
-        -scheme IsoNimCocoa \
+        -scheme Native \
         -destination 'platform=iOS,name=iPhone' \
         -configuration Debug \
         DEVELOPMENT_TEAM=GK3D7BH967 \

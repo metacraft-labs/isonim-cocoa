@@ -9,10 +9,10 @@ options:
 
 settings:
   base:
-    DEVELOPMENT_TEAM: P23728WCHN
+    DEVELOPMENT_TEAM: GK3D7BH967
 
 targets:
-  IsoNimCocoa-iOS:
+  IsoNimCocoa-Native:
     type: application
     platform: iOS
     sources:
@@ -20,7 +20,24 @@ targets:
     settings:
       base:
         INFOPLIST_FILE: ios-app/Info.plist
-        PRODUCT_BUNDLE_IDENTIFIER: com.metacraft.isonim.cocoa
+        PRODUCT_BUNDLE_IDENTIFIER: com.metacraft.isonim.cocoa.native
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: THEME_NATIVE
+        PRODUCT_NAME: "Tasks Native"
+        PRODUCT_MODULE_NAME: IsoNimCocoa_iOS
+    dependencies: []
+
+  IsoNimCocoa-Branded:
+    type: application
+    platform: iOS
+    sources:
+      - path: ios-app/Sources
+    settings:
+      base:
+        INFOPLIST_FILE: ios-app/Info.plist
+        PRODUCT_BUNDLE_IDENTIFIER: com.metacraft.isonim.cocoa.branded
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: THEME_BRANDED
+        PRODUCT_NAME: "Tasks IsoNim"
+        PRODUCT_MODULE_NAME: IsoNimCocoa_iOS
     dependencies: []
 
   IsoNimCocoa-Tests:
@@ -31,17 +48,23 @@ targets:
     settings:
       base:
         INFOPLIST_FILE: ios-app/Tests/Info.plist
-        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/IsoNimCocoa-iOS.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/IsoNimCocoa-iOS"
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Tasks Native.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Tasks Native"
         BUNDLE_LOADER: "$(TEST_HOST)"
     dependencies:
-      - target: IsoNimCocoa-iOS
+      - target: IsoNimCocoa-Native
 
 schemes:
-  IsoNimCocoa:
+  Native:
     build:
       targets:
-        IsoNimCocoa-iOS: all
+        IsoNimCocoa-Native: all
         IsoNimCocoa-Tests: [test]
     test:
       targets:
         - IsoNimCocoa-Tests
+  Branded:
+    build:
+      targets:
+        IsoNimCocoa-Branded: all
+    test:
+      targets: []
