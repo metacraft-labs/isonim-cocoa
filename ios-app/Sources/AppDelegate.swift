@@ -53,8 +53,15 @@ struct BrandedDimensions {
     static let bodyFontSize: CGFloat = 16
     static let captionFontSize: CGFloat = 14
     static let iconFontSize: CGFloat = 24
-    static let checkboxSize: CGFloat = 28
+    static let checkboxSize: CGFloat = 24
     static let addButtonSize: CGFloat = 48
+    // Row dimensions (must match Android exactly)
+    static let rowHeight: CGFloat = 56
+    static let rowPaddingH: CGFloat = 16
+    static let rowPaddingV: CGFloat = 12
+    static let rowGap: CGFloat = 8
+    static let rowRadius: CGFloat = 12
+    static let deleteIconSize: CGFloat = 20
 }
 
 @main
@@ -258,10 +265,13 @@ class TaskManagerViewController: UIViewController {
 
     private let inputField = UITextField()
     private let addButton = UIButton(type: .system)
-    private let tableView = UITableView()
     #if THEME_BRANDED
+    // Branded: UIScrollView + stacked UIViews (not UITableView)
+    private let scrollView = UIScrollView()
+    private let stackView = UIStackView()
     private var filterButtons: [UIButton] = []
     #else
+    private let tableView = UITableView()
     private let filterControl = UISegmentedControl(items: TaskFilter.allCases.map { $0.title })
     #endif
     private let clearButton = UIButton(type: .system)
@@ -296,7 +306,7 @@ class TaskManagerViewController: UIViewController {
         setupInputBar()
         setupTableView()
         setupBottomBar()
-        updateEmptyState()
+        refreshList()
     }
 
     // MARK: - Input Bar
@@ -405,9 +415,47 @@ class TaskManagerViewController: UIViewController {
         container.tag = 100
     }
 
-    // MARK: - Table View
+    // MARK: - Task List View
 
     private func setupTableView() {
+        emptyLabel.translatesAutoresizingMaskIntoConstraints = false
+        emptyLabel.text = "No tasks yet.\nTap + to add one."
+        emptyLabel.textAlignment = .center
+        emptyLabel.numberOfLines = 0
+
+        guard let inputContainer = view.viewWithTag(100) else { return }
+
+        #if THEME_BRANDED
+        // Branded: UIScrollView + stacked UIViews (not UITableView)
+        scrollView.translatesAutoresizingMaskIntoConstraints = false
+        scrollView.alwaysBounceVertical = true
+        scrollView.backgroundColor = AppTheme.current.background
+        view.addSubview(scrollView)
+
+        stackView.axis = .vertical
+        stackView.spacing = BrandedDimensions.rowGap
+        stackView.translatesAutoresizingMaskIntoConstraints = false
+        scrollView.addSubview(stackView)
+
+        emptyLabel.textColor = AppTheme.current.textSecondary
+        emptyLabel.font = .systemFont(ofSize: 18)
+        view.addSubview(emptyLabel)
+
+        NSLayoutConstraint.activate([
+            scrollView.topAnchor.constraint(equalTo: inputContainer.bottomAnchor),
+            scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+
+            stackView.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor, constant: BrandedDimensions.rowGap),
+            stackView.leadingAnchor.constraint(equalTo: scrollView.frameLayoutGuide.leadingAnchor, constant: BrandedDimensions.rowPaddingH),
+            stackView.trailingAnchor.constraint(equalTo: scrollView.frameLayoutGuide.trailingAnchor, constant: -BrandedDimensions.rowPaddingH),
+            stackView.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor, constant: -BrandedDimensions.rowGap),
+
+            emptyLabel.centerXAnchor.constraint(equalTo: scrollView.centerXAnchor),
+            emptyLabel.centerYAnchor.constraint(equalTo: scrollView.centerYAnchor),
+        ])
+        #else
+        let tableView = self.tableView
         tableView.translatesAutoresizingMaskIntoConstraints = false
         tableView.backgroundColor = AppTheme.current.background
         tableView.register(TaskCell.self, forCellReuseIdentifier: TaskCell.reuseID)
@@ -418,20 +466,9 @@ class TaskManagerViewController: UIViewController {
         tableView.separatorInset = UIEdgeInsets(top: 0, left: 60, bottom: 0, right: 0)
         view.addSubview(tableView)
 
-        emptyLabel.translatesAutoresizingMaskIntoConstraints = false
-        emptyLabel.text = "No tasks yet.\nTap + to add one."
-        emptyLabel.textAlignment = .center
-        emptyLabel.numberOfLines = 0
-        #if THEME_BRANDED
-        emptyLabel.textColor = AppTheme.current.textSecondary
-        emptyLabel.font = .systemFont(ofSize: 18)
-        #else
         emptyLabel.textColor = .tertiaryLabel
         emptyLabel.font = .preferredFont(forTextStyle: .title3)
-        #endif
         view.addSubview(emptyLabel)
-
-        guard let inputContainer = view.viewWithTag(100) else { return }
 
         NSLayoutConstraint.activate([
             tableView.topAnchor.constraint(equalTo: inputContainer.bottomAnchor),
@@ -441,6 +478,7 @@ class TaskManagerViewController: UIViewController {
             emptyLabel.centerXAnchor.constraint(equalTo: tableView.centerXAnchor),
             emptyLabel.centerYAnchor.constraint(equalTo: tableView.centerYAnchor),
         ])
+        #endif
     }
 
     // MARK: - Bottom Bar
@@ -490,7 +528,7 @@ class TaskManagerViewController: UIViewController {
         bottomContainer.addSubview(clearButton)
 
         NSLayoutConstraint.activate([
-            tableView.bottomAnchor.constraint(equalTo: bottomContainer.topAnchor),
+            scrollView.bottomAnchor.constraint(equalTo: bottomContainer.topAnchor),
 
             bottomContainer.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             bottomContainer.trailingAnchor.constraint(equalTo: view.trailingAnchor),
@@ -551,16 +589,14 @@ class TaskManagerViewController: UIViewController {
         tasks.append(Task(title: text))
         inputField.text = ""
         inputField.resignFirstResponder()
-        tableView.reloadData()
-        updateEmptyState()
+        refreshList()
     }
 
     #if THEME_BRANDED
     @objc private func filterPillTapped(_ sender: UIButton) {
         currentFilter = TaskFilter(rawValue: sender.tag) ?? .all
         updateFilterPillAppearance()
-        tableView.reloadData()
-        updateEmptyState()
+        refreshList()
     }
 
     private func updateFilterPillAppearance() {
@@ -575,9 +611,130 @@ class TaskManagerViewController: UIViewController {
             }
         }
     }
+
+    private func refreshList() {
+        // Remove all existing rows
+        for arrangedSubview in stackView.arrangedSubviews {
+            stackView.removeArrangedSubview(arrangedSubview)
+            arrangedSubview.removeFromSuperview()
+        }
+
+        // Add a row for each filtered task
+        for task in filteredTasks {
+            let rowView = createBrandedRow(for: task)
+            stackView.addArrangedSubview(rowView)
+        }
+
+        updateEmptyState()
+    }
+
+    private func createBrandedRow(for task: Task) -> UIView {
+        let row = UIView()
+        row.translatesAutoresizingMaskIntoConstraints = false
+        row.backgroundColor = AppTheme.current.surface
+        row.layer.cornerRadius = BrandedDimensions.rowRadius
+
+        // Checkbox
+        let checkboxView = UIView()
+        checkboxView.translatesAutoresizingMaskIntoConstraints = false
+        checkboxView.layer.cornerRadius = BrandedDimensions.checkboxRadius
+        checkboxView.layer.borderWidth = 2
+        checkboxView.isUserInteractionEnabled = true
+
+        let checkmarkLabel = UILabel()
+        checkmarkLabel.translatesAutoresizingMaskIntoConstraints = false
+        checkmarkLabel.text = "\u{2713}"
+        checkmarkLabel.font = .systemFont(ofSize: BrandedDimensions.bodyFontSize)
+        checkmarkLabel.textColor = .white
+        checkmarkLabel.textAlignment = .center
+        checkboxView.addSubview(checkmarkLabel)
+
+        if task.isCompleted {
+            checkboxView.backgroundColor = AppTheme.current.primary
+            checkboxView.layer.borderColor = AppTheme.current.primary.cgColor
+            checkmarkLabel.isHidden = false
+        } else {
+            checkboxView.backgroundColor = .clear
+            checkboxView.layer.borderColor = AppTheme.current.border.cgColor
+            checkmarkLabel.isHidden = true
+        }
+
+        let toggleGesture = UITapGestureRecognizer(target: self, action: #selector(rowCheckboxTapped(_:)))
+        checkboxView.addGestureRecognizer(toggleGesture)
+        row.addSubview(checkboxView)
+
+        // Title label
+        let titleLabel = UILabel()
+        titleLabel.translatesAutoresizingMaskIntoConstraints = false
+        titleLabel.text = task.title
+        titleLabel.font = .systemFont(ofSize: BrandedDimensions.bodyFontSize)
+        titleLabel.textColor = task.isCompleted ? AppTheme.current.textDisabled : AppTheme.current.textPrimary
+        titleLabel.numberOfLines = 1
+        row.addSubview(titleLabel)
+
+        // Delete button
+        let deleteButton = UIButton(type: .system)
+        deleteButton.translatesAutoresizingMaskIntoConstraints = false
+        deleteButton.setTitle("\u{2715}", for: .normal)
+        deleteButton.titleLabel?.font = .systemFont(ofSize: BrandedDimensions.deleteIconSize)
+        deleteButton.setTitleColor(AppTheme.current.error, for: .normal)
+        deleteButton.addTarget(self, action: #selector(rowDeleteTapped(_:)), for: .touchUpInside)
+        row.addSubview(deleteButton)
+
+        // Store task ID in tag for identification (use hash)
+        let taskIdHash = abs(task.id.hashValue) % Int.max
+        checkboxView.tag = taskIdHash
+        deleteButton.tag = taskIdHash
+        row.tag = taskIdHash
+
+        NSLayoutConstraint.activate([
+            row.heightAnchor.constraint(equalToConstant: BrandedDimensions.rowHeight),
+
+            checkboxView.leadingAnchor.constraint(equalTo: row.leadingAnchor, constant: BrandedDimensions.rowPaddingH),
+            checkboxView.centerYAnchor.constraint(equalTo: row.centerYAnchor),
+            checkboxView.widthAnchor.constraint(equalToConstant: BrandedDimensions.checkboxSize),
+            checkboxView.heightAnchor.constraint(equalToConstant: BrandedDimensions.checkboxSize),
+
+            checkmarkLabel.centerXAnchor.constraint(equalTo: checkboxView.centerXAnchor),
+            checkmarkLabel.centerYAnchor.constraint(equalTo: checkboxView.centerYAnchor),
+
+            titleLabel.leadingAnchor.constraint(equalTo: checkboxView.trailingAnchor, constant: BrandedDimensions.innerPadding),
+            titleLabel.centerYAnchor.constraint(equalTo: row.centerYAnchor),
+
+            deleteButton.leadingAnchor.constraint(equalTo: titleLabel.trailingAnchor, constant: BrandedDimensions.gap),
+            deleteButton.trailingAnchor.constraint(equalTo: row.trailingAnchor, constant: -BrandedDimensions.rowPaddingH),
+            deleteButton.centerYAnchor.constraint(equalTo: row.centerYAnchor),
+            deleteButton.widthAnchor.constraint(equalToConstant: BrandedDimensions.checkboxSize),
+            deleteButton.heightAnchor.constraint(equalToConstant: BrandedDimensions.checkboxSize),
+        ])
+
+        return row
+    }
+
+    @objc private func rowCheckboxTapped(_ sender: UITapGestureRecognizer) {
+        guard let tag = sender.view?.tag else { return }
+        if let idx = tasks.firstIndex(where: { abs($0.id.hashValue) % Int.max == tag }) {
+            tasks[idx].isCompleted.toggle()
+            refreshList()
+        }
+    }
+
+    @objc private func rowDeleteTapped(_ sender: UIButton) {
+        let tag = sender.tag
+        if let idx = tasks.firstIndex(where: { abs($0.id.hashValue) % Int.max == tag }) {
+            tasks.remove(at: idx)
+            refreshList()
+        }
+    }
+
     #else
     @objc private func filterChanged() {
         currentFilter = TaskFilter(rawValue: filterControl.selectedSegmentIndex) ?? .all
+        tableView.reloadData()
+        updateEmptyState()
+    }
+
+    private func refreshList() {
         tableView.reloadData()
         updateEmptyState()
     }
@@ -585,14 +742,18 @@ class TaskManagerViewController: UIViewController {
 
     @objc private func clearCompleted() {
         tasks.removeAll { $0.isCompleted }
-        tableView.reloadData()
-        updateEmptyState()
+        refreshList()
     }
 
     private func updateEmptyState() {
         let empty = filteredTasks.isEmpty
         emptyLabel.isHidden = !empty
+
+        #if THEME_BRANDED
+        scrollView.isHidden = empty
+        #else
         tableView.isHidden = empty
+        #endif
 
         if empty {
             switch currentFilter {
@@ -613,6 +774,7 @@ class TaskManagerViewController: UIViewController {
     }
 }
 
+#if !THEME_BRANDED
 // MARK: - UITableViewDataSource & Delegate
 
 extension TaskManagerViewController: UITableViewDataSource, UITableViewDelegate {
@@ -629,8 +791,7 @@ extension TaskManagerViewController: UITableViewDataSource, UITableViewDelegate 
             guard let self = self else { return }
             if let idx = self.tasks.firstIndex(where: { $0.id == task.id }) {
                 self.tasks[idx].isCompleted.toggle()
-                tableView.reloadData()
-                self.updateEmptyState()
+                self.refreshList()
             }
         }
 
@@ -638,14 +799,14 @@ extension TaskManagerViewController: UITableViewDataSource, UITableViewDelegate 
             guard let self = self else { return }
             if let idx = self.tasks.firstIndex(where: { $0.id == task.id }) {
                 self.tasks.remove(at: idx)
-                tableView.reloadData()
-                self.updateEmptyState()
+                self.refreshList()
             }
         }
 
         return cell
     }
 }
+#endif
 
 // MARK: - UITextFieldDelegate
 
