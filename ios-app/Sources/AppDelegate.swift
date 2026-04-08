@@ -8,6 +8,7 @@ struct AppTheme {
     let surface: UIColor
     let textPrimary: UIColor
     let textSecondary: UIColor
+    let textDisabled: UIColor
     let error: UIColor
     let border: UIColor
     let inputBackground: UIColor
@@ -19,6 +20,7 @@ struct AppTheme {
         surface: .white,
         textPrimary: UIColor(red: 0x0F/255.0, green: 0x17/255.0, blue: 0x2A/255.0, alpha: 1),  // #0F172A
         textSecondary: UIColor(red: 0x64/255.0, green: 0x74/255.0, blue: 0x8B/255.0, alpha: 1),// #64748B
+        textDisabled: UIColor(red: 0xCB/255.0, green: 0xD5/255.0, blue: 0xE1/255.0, alpha: 1), // #CBD5E1
         error: UIColor(red: 0xEF/255.0, green: 0x44/255.0, blue: 0x44/255.0, alpha: 1),        // #EF4444
         border: UIColor(red: 0xE2/255.0, green: 0xE8/255.0, blue: 0xF0/255.0, alpha: 1),       // #E2E8F0
         inputBackground: UIColor(red: 0xF1/255.0, green: 0xF5/255.0, blue: 0xF9/255.0, alpha: 1) // #F1F5F9
@@ -30,11 +32,29 @@ struct AppTheme {
         surface: .systemBackground,
         textPrimary: .label,
         textSecondary: .secondaryLabel,
+        textDisabled: .tertiaryLabel,
         error: .systemRed,
         border: .separator,
         inputBackground: .secondarySystemBackground
     )
     #endif
+}
+
+// MARK: - Branded Dimensions (isoTheme design tokens)
+
+struct BrandedDimensions {
+    static let outerPadding: CGFloat = 16
+    static let innerPadding: CGFloat = 12
+    static let gap: CGFloat = 8
+    static let buttonRadius: CGFloat = 8
+    static let checkboxRadius: CGFloat = 6
+    static let filterPillRadius: CGFloat = 16
+    static let titleFontSize: CGFloat = 32
+    static let bodyFontSize: CGFloat = 16
+    static let captionFontSize: CGFloat = 14
+    static let iconFontSize: CGFloat = 24
+    static let checkboxSize: CGFloat = 28
+    static let addButtonSize: CGFloat = 48
 }
 
 @main
@@ -92,6 +112,12 @@ class TaskCell: UITableViewCell {
     private let titleLabel = UILabel()
     private let deleteButton = UIButton(type: .system)
 
+    #if THEME_BRANDED
+    // Custom checkbox view for branded mode
+    private let checkboxView = UIView()
+    private let checkmarkLabel = UILabel()
+    #endif
+
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
         super.init(style: style, reuseIdentifier: reuseIdentifier)
         selectionStyle = .none
@@ -101,6 +127,55 @@ class TaskCell: UITableViewCell {
     required init?(coder: NSCoder) { fatalError() }
 
     private func setupViews() {
+        #if THEME_BRANDED
+        // Custom checkbox: 28x28 rounded rect
+        checkboxView.translatesAutoresizingMaskIntoConstraints = false
+        checkboxView.layer.cornerRadius = BrandedDimensions.checkboxRadius
+        checkboxView.layer.borderWidth = 2
+        checkboxView.isUserInteractionEnabled = true
+        checkboxView.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(toggleTapped)))
+        contentView.addSubview(checkboxView)
+
+        checkmarkLabel.translatesAutoresizingMaskIntoConstraints = false
+        checkmarkLabel.text = "✓"
+        checkmarkLabel.font = .systemFont(ofSize: BrandedDimensions.bodyFontSize)
+        checkmarkLabel.textColor = .white
+        checkmarkLabel.textAlignment = .center
+        checkboxView.addSubview(checkmarkLabel)
+
+        titleLabel.translatesAutoresizingMaskIntoConstraints = false
+        titleLabel.font = .systemFont(ofSize: BrandedDimensions.bodyFontSize)
+        titleLabel.numberOfLines = 0
+        contentView.addSubview(titleLabel)
+
+        // Delete button: text "✕" in error color
+        deleteButton.translatesAutoresizingMaskIntoConstraints = false
+        deleteButton.setTitle("✕", for: .normal)
+        deleteButton.titleLabel?.font = .systemFont(ofSize: 18)
+        deleteButton.setTitleColor(AppTheme.current.error, for: .normal)
+        deleteButton.addTarget(self, action: #selector(deleteTapped), for: .touchUpInside)
+        contentView.addSubview(deleteButton)
+
+        NSLayoutConstraint.activate([
+            checkboxView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: BrandedDimensions.outerPadding),
+            checkboxView.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
+            checkboxView.widthAnchor.constraint(equalToConstant: BrandedDimensions.checkboxSize),
+            checkboxView.heightAnchor.constraint(equalToConstant: BrandedDimensions.checkboxSize),
+
+            checkmarkLabel.centerXAnchor.constraint(equalTo: checkboxView.centerXAnchor),
+            checkmarkLabel.centerYAnchor.constraint(equalTo: checkboxView.centerYAnchor),
+
+            titleLabel.leadingAnchor.constraint(equalTo: checkboxView.trailingAnchor, constant: BrandedDimensions.innerPadding),
+            titleLabel.topAnchor.constraint(equalTo: contentView.topAnchor, constant: BrandedDimensions.innerPadding),
+            titleLabel.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -BrandedDimensions.innerPadding),
+
+            deleteButton.leadingAnchor.constraint(equalTo: titleLabel.trailingAnchor, constant: BrandedDimensions.gap),
+            deleteButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -BrandedDimensions.outerPadding),
+            deleteButton.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
+            deleteButton.widthAnchor.constraint(equalToConstant: BrandedDimensions.checkboxSize),
+            deleteButton.heightAnchor.constraint(equalToConstant: BrandedDimensions.checkboxSize),
+        ])
+        #else
         checkButton.translatesAutoresizingMaskIntoConstraints = false
         checkButton.addTarget(self, action: #selector(toggleTapped), for: .touchUpInside)
         checkButton.tintColor = AppTheme.current.primary
@@ -133,9 +208,24 @@ class TaskCell: UITableViewCell {
             deleteButton.widthAnchor.constraint(equalToConstant: 32),
             deleteButton.heightAnchor.constraint(equalToConstant: 32),
         ])
+        #endif
     }
 
     func configure(with task: Task) {
+        #if THEME_BRANDED
+        titleLabel.text = task.title
+        if task.isCompleted {
+            checkboxView.backgroundColor = AppTheme.current.primary
+            checkboxView.layer.borderColor = AppTheme.current.primary.cgColor
+            checkmarkLabel.isHidden = false
+            titleLabel.textColor = AppTheme.current.textDisabled
+        } else {
+            checkboxView.backgroundColor = .clear
+            checkboxView.layer.borderColor = AppTheme.current.border.cgColor
+            checkmarkLabel.isHidden = true
+            titleLabel.textColor = AppTheme.current.textPrimary
+        }
+        #else
         titleLabel.text = task.title
         let iconName = task.isCompleted ? "checkmark.circle.fill" : "circle"
         checkButton.setImage(UIImage(systemName: iconName), for: .normal)
@@ -153,6 +243,7 @@ class TaskCell: UITableViewCell {
             titleLabel.attributedText = nil
             titleLabel.text = task.title
         }
+        #endif
     }
 
     @objc private func toggleTapped() { onToggle?() }
@@ -168,7 +259,11 @@ class TaskManagerViewController: UIViewController {
     private let inputField = UITextField()
     private let addButton = UIButton(type: .system)
     private let tableView = UITableView()
+    #if THEME_BRANDED
+    private var filterButtons: [UIButton] = []
+    #else
     private let filterControl = UISegmentedControl(items: TaskFilter.allCases.map { $0.title })
+    #endif
     private let clearButton = UIButton(type: .system)
     private let emptyLabel = UILabel()
 
@@ -184,7 +279,20 @@ class TaskManagerViewController: UIViewController {
         super.viewDidLoad()
         title = "Tasks"
         view.backgroundColor = AppTheme.current.background
+        #if THEME_BRANDED
+        // Branded: use explicit font size for title, matching isoTheme 32sp
         navigationController?.navigationBar.prefersLargeTitles = true
+        if let appearance = navigationController?.navigationBar.standardAppearance {
+            appearance.largeTitleTextAttributes = [
+                .foregroundColor: AppTheme.current.textPrimary,
+                .font: UIFont.systemFont(ofSize: BrandedDimensions.titleFontSize, weight: .bold)
+            ]
+            navigationController?.navigationBar.standardAppearance = appearance
+            navigationController?.navigationBar.scrollEdgeAppearance = appearance
+        }
+        #else
+        navigationController?.navigationBar.prefersLargeTitles = true
+        #endif
         setupInputBar()
         setupTableView()
         setupBottomBar()
@@ -203,21 +311,43 @@ class TaskManagerViewController: UIViewController {
         inputField.placeholder = "What needs to be done?"
         inputField.borderStyle = .none
         inputField.backgroundColor = AppTheme.current.inputBackground
+        inputField.returnKeyType = .done
+        inputField.delegate = self
+
+        #if THEME_BRANDED
+        inputField.layer.cornerRadius = BrandedDimensions.buttonRadius
+        inputField.font = .systemFont(ofSize: BrandedDimensions.bodyFontSize)
+        inputField.textColor = AppTheme.current.textPrimary
+        inputField.leftView = UIView(frame: CGRect(x: 0, y: 0, width: BrandedDimensions.innerPadding, height: 0))
+        inputField.leftViewMode = .always
+        inputField.rightView = UIView(frame: CGRect(x: 0, y: 0, width: BrandedDimensions.innerPadding, height: 0))
+        inputField.rightViewMode = .always
+        #else
         inputField.layer.cornerRadius = 10
         inputField.leftView = UIView(frame: CGRect(x: 0, y: 0, width: 12, height: 0))
         inputField.leftViewMode = .always
         inputField.rightView = UIView(frame: CGRect(x: 0, y: 0, width: 12, height: 0))
         inputField.rightViewMode = .always
-        inputField.returnKeyType = .done
-        inputField.delegate = self
+        #endif
         container.addSubview(inputField)
 
+        #if THEME_BRANDED
+        // Custom add button: 48x48 filled rounded rect with "+" text
+        addButton.translatesAutoresizingMaskIntoConstraints = false
+        addButton.backgroundColor = AppTheme.current.primary
+        addButton.layer.cornerRadius = BrandedDimensions.buttonRadius
+        addButton.setTitle("+", for: .normal)
+        addButton.titleLabel?.font = .systemFont(ofSize: BrandedDimensions.iconFontSize)
+        addButton.setTitleColor(.white, for: .normal)
+        addButton.addTarget(self, action: #selector(addTask), for: .touchUpInside)
+        #else
         addButton.translatesAutoresizingMaskIntoConstraints = false
         addButton.setImage(UIImage(systemName: "plus.circle.fill"), for: .normal)
         addButton.tintColor = AppTheme.current.primary
         addButton.contentVerticalAlignment = .fill
         addButton.contentHorizontalAlignment = .fill
         addButton.addTarget(self, action: #selector(addTask), for: .touchUpInside)
+        #endif
         container.addSubview(addButton)
 
         let separator = UIView()
@@ -225,6 +355,29 @@ class TaskManagerViewController: UIViewController {
         separator.backgroundColor = AppTheme.current.border
         container.addSubview(separator)
 
+        #if THEME_BRANDED
+        NSLayoutConstraint.activate([
+            container.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            container.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            container.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+
+            inputField.topAnchor.constraint(equalTo: container.topAnchor, constant: BrandedDimensions.gap),
+            inputField.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: BrandedDimensions.outerPadding),
+            inputField.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -BrandedDimensions.gap),
+            inputField.heightAnchor.constraint(equalToConstant: BrandedDimensions.addButtonSize),
+
+            addButton.leadingAnchor.constraint(equalTo: inputField.trailingAnchor, constant: BrandedDimensions.gap),
+            addButton.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -BrandedDimensions.outerPadding),
+            addButton.centerYAnchor.constraint(equalTo: inputField.centerYAnchor),
+            addButton.widthAnchor.constraint(equalToConstant: BrandedDimensions.addButtonSize),
+            addButton.heightAnchor.constraint(equalToConstant: BrandedDimensions.addButtonSize),
+
+            separator.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            separator.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            separator.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+            separator.heightAnchor.constraint(equalToConstant: 0.5),
+        ])
+        #else
         NSLayoutConstraint.activate([
             container.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
             container.leadingAnchor.constraint(equalTo: view.leadingAnchor),
@@ -246,6 +399,7 @@ class TaskManagerViewController: UIViewController {
             separator.bottomAnchor.constraint(equalTo: container.bottomAnchor),
             separator.heightAnchor.constraint(equalToConstant: 0.5),
         ])
+        #endif
 
         // Store container reference for table view layout
         container.tag = 100
@@ -267,9 +421,14 @@ class TaskManagerViewController: UIViewController {
         emptyLabel.translatesAutoresizingMaskIntoConstraints = false
         emptyLabel.text = "No tasks yet.\nTap + to add one."
         emptyLabel.textAlignment = .center
+        emptyLabel.numberOfLines = 0
+        #if THEME_BRANDED
+        emptyLabel.textColor = AppTheme.current.textSecondary
+        emptyLabel.font = .systemFont(ofSize: 18)
+        #else
         emptyLabel.textColor = .tertiaryLabel
         emptyLabel.font = .preferredFont(forTextStyle: .title3)
-        emptyLabel.numberOfLines = 0
+        #endif
         view.addSubview(emptyLabel)
 
         guard let inputContainer = view.viewWithTag(100) else { return }
@@ -297,6 +456,59 @@ class TaskManagerViewController: UIViewController {
         topSep.backgroundColor = AppTheme.current.border
         bottomContainer.addSubview(topSep)
 
+        #if THEME_BRANDED
+        // Custom filter pills: rounded buttons with 16pt radius
+        let filterStack = UIStackView()
+        filterStack.translatesAutoresizingMaskIntoConstraints = false
+        filterStack.axis = .horizontal
+        filterStack.spacing = 4
+        filterStack.alignment = .center
+
+        for filter in TaskFilter.allCases {
+            let btn = UIButton(type: .system)
+            btn.setTitle(filter.title, for: .normal)
+            btn.titleLabel?.font = .systemFont(ofSize: BrandedDimensions.captionFontSize)
+            btn.layer.cornerRadius = BrandedDimensions.filterPillRadius
+            btn.clipsToBounds = true
+            btn.contentEdgeInsets = UIEdgeInsets(
+                top: BrandedDimensions.gap, left: BrandedDimensions.innerPadding,
+                bottom: BrandedDimensions.gap, right: BrandedDimensions.innerPadding
+            )
+            btn.tag = filter.rawValue
+            btn.addTarget(self, action: #selector(filterPillTapped(_:)), for: .touchUpInside)
+            filterButtons.append(btn)
+            filterStack.addArrangedSubview(btn)
+        }
+        updateFilterPillAppearance()
+        bottomContainer.addSubview(filterStack)
+
+        clearButton.translatesAutoresizingMaskIntoConstraints = false
+        clearButton.setTitle("Clear Completed", for: .normal)
+        clearButton.titleLabel?.font = .systemFont(ofSize: BrandedDimensions.captionFontSize)
+        clearButton.setTitleColor(AppTheme.current.error, for: .normal)
+        clearButton.addTarget(self, action: #selector(clearCompleted), for: .touchUpInside)
+        bottomContainer.addSubview(clearButton)
+
+        NSLayoutConstraint.activate([
+            tableView.bottomAnchor.constraint(equalTo: bottomContainer.topAnchor),
+
+            bottomContainer.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            bottomContainer.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            bottomContainer.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
+
+            topSep.topAnchor.constraint(equalTo: bottomContainer.topAnchor),
+            topSep.leadingAnchor.constraint(equalTo: bottomContainer.leadingAnchor),
+            topSep.trailingAnchor.constraint(equalTo: bottomContainer.trailingAnchor),
+            topSep.heightAnchor.constraint(equalToConstant: 0.5),
+
+            filterStack.topAnchor.constraint(equalTo: bottomContainer.topAnchor, constant: BrandedDimensions.innerPadding),
+            filterStack.centerXAnchor.constraint(equalTo: bottomContainer.centerXAnchor),
+
+            clearButton.topAnchor.constraint(equalTo: filterStack.bottomAnchor, constant: BrandedDimensions.gap),
+            clearButton.centerXAnchor.constraint(equalTo: bottomContainer.centerXAnchor),
+            clearButton.bottomAnchor.constraint(equalTo: bottomContainer.bottomAnchor, constant: -BrandedDimensions.gap),
+        ])
+        #else
         filterControl.translatesAutoresizingMaskIntoConstraints = false
         filterControl.selectedSegmentIndex = 0
         filterControl.addTarget(self, action: #selector(filterChanged), for: .valueChanged)
@@ -328,6 +540,7 @@ class TaskManagerViewController: UIViewController {
             clearButton.centerXAnchor.constraint(equalTo: bottomContainer.centerXAnchor),
             clearButton.bottomAnchor.constraint(equalTo: bottomContainer.bottomAnchor, constant: -8),
         ])
+        #endif
     }
 
     // MARK: - Actions
@@ -342,11 +555,33 @@ class TaskManagerViewController: UIViewController {
         updateEmptyState()
     }
 
+    #if THEME_BRANDED
+    @objc private func filterPillTapped(_ sender: UIButton) {
+        currentFilter = TaskFilter(rawValue: sender.tag) ?? .all
+        updateFilterPillAppearance()
+        tableView.reloadData()
+        updateEmptyState()
+    }
+
+    private func updateFilterPillAppearance() {
+        for btn in filterButtons {
+            let isActive = btn.tag == currentFilter.rawValue
+            if isActive {
+                btn.backgroundColor = AppTheme.current.primary
+                btn.setTitleColor(.white, for: .normal)
+            } else {
+                btn.backgroundColor = .clear
+                btn.setTitleColor(AppTheme.current.textSecondary, for: .normal)
+            }
+        }
+    }
+    #else
     @objc private func filterChanged() {
         currentFilter = TaskFilter(rawValue: filterControl.selectedSegmentIndex) ?? .all
         tableView.reloadData()
         updateEmptyState()
     }
+    #endif
 
     @objc private func clearCompleted() {
         tasks.removeAll { $0.isCompleted }
