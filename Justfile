@@ -109,16 +109,37 @@ deploy-device: xcode-build-device
     echo "Deploying $APP_PATH..."
     ios-deploy --bundle "$APP_PATH"
 
+# Deploy app to connected iPhone (with team provisioning)
+deploy-iphone: xcode-generate
+    #!/usr/bin/env bash
+    set -euo pipefail
+    /usr/bin/env -i HOME="$HOME" USER="$USER" TMPDIR="${TMPDIR:-/tmp}" \
+      PATH="/usr/bin:/bin:/usr/sbin:/sbin" \
+      DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
+      /usr/bin/xcodebuild build \
+        -project IsoNimCocoa.xcodeproj \
+        -target IsoNimCocoa-iOS \
+        -configuration Debug \
+        DEVELOPMENT_TEAM=GK3D7BH967 \
+        -destination 'generic/platform=iOS' \
+        -allowProvisioningUpdates 2>&1 | tail -3
+    APP=$(find build -name "IsoNimCocoa-iOS.app" -path "*/Debug-iphoneos/*" | head -1)
+    echo "Installing $APP..."
+    ios-deploy --bundle "$APP" --justlaunch 2>&1 | tail -3
+    echo "Done — app should be running on iPhone"
+
 # Run XCTests on connected device
 test-device: xcode-generate
-    /usr/bin/env -i HOME="$HOME" PATH="/usr/bin:/bin:/usr/sbin:/sbin" \
+    /usr/bin/env -i HOME="$HOME" USER="$USER" TMPDIR="${TMPDIR:-/tmp}" \
+      PATH="/usr/bin:/bin:/usr/sbin:/sbin" \
       DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
       /usr/bin/xcodebuild test \
         -project IsoNimCocoa.xcodeproj \
         -scheme IsoNimCocoa \
         -destination 'platform=iOS,name=iPhone' \
         -configuration Debug \
-        CODE_SIGN_IDENTITY="Apple Development" \
+        DEVELOPMENT_TEAM=GK3D7BH967 \
+        -allowProvisioningUpdates \
         2>&1 | grep -E "Test Case|Executed|BUILD"
 
 # ─────────────────────────────────────────────────────────────────────────────

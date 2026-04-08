@@ -21,8 +21,11 @@ class IsoNimCocoaTests: XCTestCase {
     func testAppLaunchSetsRootViewController() {
         XCTAssertNotNil(app.window, "Window should be created")
         XCTAssertNotNil(app.window?.rootViewController, "Root view controller should be set")
-        XCTAssertTrue(app.window?.rootViewController is ViewController,
-                      "Root view controller should be a ViewController")
+        XCTAssertTrue(app.window?.rootViewController is UINavigationController,
+                      "Root view controller should be a UINavigationController")
+        let nav = app.window?.rootViewController as? UINavigationController
+        XCTAssertTrue(nav?.topViewController is TaskManagerViewController,
+                      "Top view controller should be a TaskManagerViewController")
     }
 
     func testWindowIsVisible() {
@@ -60,8 +63,9 @@ class IsoNimCocoaTests: XCTestCase {
     // MARK: - Orientation
 
     func testViewControllerSupportsMultipleOrientations() {
-        guard let vc = app.window?.rootViewController as? ViewController else {
-            XCTFail("Root view controller should be a ViewController")
+        let nav = app.window?.rootViewController as? UINavigationController
+        guard let vc = nav?.topViewController as? TaskManagerViewController else {
+            XCTFail("Top view controller should be a TaskManagerViewController")
             return
         }
         let mask = vc.supportedInterfaceOrientations
@@ -72,25 +76,21 @@ class IsoNimCocoaTests: XCTestCase {
 
     // MARK: - UI Content
 
-    func testTitleLabelIsPresent() {
-        guard let vc = app.window?.rootViewController as? ViewController else {
-            XCTFail("Root view controller should be a ViewController")
+    func testTaskManagerHasTitle() {
+        let nav = app.window?.rootViewController as? UINavigationController
+        guard let vc = nav?.topViewController as? TaskManagerViewController else {
+            XCTFail("Top view controller should be a TaskManagerViewController")
             return
         }
         vc.view.setNeedsLayout()
         vc.view.layoutIfNeeded()
-        XCTAssertEqual(vc.titleLabel.text, "IsoNim Cocoa")
+        XCTAssertEqual(vc.title, "Tasks", "Navigation title should be 'Tasks'")
     }
 
-    func testVersionLabelIsPresent() {
-        guard let vc = app.window?.rootViewController as? ViewController else {
-            XCTFail("Root view controller should be a ViewController")
-            return
-        }
-        vc.view.setNeedsLayout()
-        vc.view.layoutIfNeeded()
-        XCTAssertNotNil(vc.versionLabel.text, "Version label should have text")
-        XCTAssertTrue(vc.versionLabel.text?.hasPrefix("v") ?? false,
-                      "Version label should start with 'v'")
+    func testTaskManagerHasNavigationBar() {
+        let nav = app.window?.rootViewController as? UINavigationController
+        XCTAssertNotNil(nav, "Should have navigation controller")
+        XCTAssertFalse(nav?.isNavigationBarHidden ?? true,
+                       "Navigation bar should be visible")
     }
 }
