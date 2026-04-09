@@ -1,13 +1,10 @@
-## App entry point — called from Swift/ObjC thin shell.
-## Drives the branded UI from Nim using UIKitRenderer + TaskStore + Yoga.
-##
-## The tree is built once via reactive rendering. Signal mutations trigger
-## fine-grained updates. Layout is recomputed after each reactive batch.
+## App entry point for native controls variant — called from Swift/ObjC thin shell.
+## Same architecture as app_entry.nim but compiled with -d:nativeControls
+## which routes through native_ios_controls instead of branded_controls.
 
 import isonim_cocoa/objc_runtime
 import isonim_cocoa/uikit_renderer
 import isonim_cocoa/uikit/views
-import isonim/theming/theme
 import isonim/components/task_app
 import isonim/layout/layout_engine
 import isonim/core/[owner, signals, computation]
@@ -19,7 +16,7 @@ var screenHeight: float = 844.0
 var safeAreaTop: float = 59.0
 var safeAreaBottom: float = 34.0
 
-proc isonim_start(rootView: pointer; width, height, saTop, saBottom: cdouble) {.exportc, cdecl.} =
+proc isonim_native_start(rootView: pointer; width, height, saTop, saBottom: cdouble) {.exportc, cdecl.} =
   currentRootView = Id(rootView)
   screenWidth = width
   screenHeight = height
@@ -31,11 +28,9 @@ proc isonim_start(rootView: pointer; width, height, saTop, saBottom: cdouble) {.
     let r = UIKitRenderer(engine: engine)
     let store = createTaskStore()
 
-    # Build tree once — reactive components handle updates
     let rendered = renderApp[UIKitRenderer, UIKitElement](r, store)
     currentRenderedRoot = rendered
 
-    # Layout pass: recompute whenever structural signals change
     let safeWidth = screenWidth
     let safeHeight = screenHeight - safeAreaTop - safeAreaBottom
     let setFrameSel = sel("setFrame:")
@@ -52,16 +47,13 @@ proc isonim_start(rootView: pointer; width, height, saTop, saBottom: cdouble) {.
             size: CGSize(width: CGFloat(layout.width), height: CGFloat(layout.height)))
           msgSendVoidCGRect(view, setFrameSel, rect)
 
-    # Initial layout
     applyLayout()
 
-    # Reactive layout — re-run when tasks or filter change
     createRenderEffect proc() =
       discard store.tasks.val
       discard store.filter.val
       applyLayout()
 
-    # Position root in safe area and attach to window
     msgSendVoidCGRect(currentRenderedRoot, setFrameSel,
       CGRect(origin: CGPoint(x: 0, y: safeAreaTop),
              size: CGSize(width: screenWidth,

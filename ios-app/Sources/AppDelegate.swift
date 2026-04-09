@@ -13,7 +13,8 @@ struct AppTheme {
     let border: UIColor
     let inputBackground: UIColor
 
-    #if THEME_BRANDED
+    #if THEME_BRANDED || THEME_BASELINE || THEME_NIM_NATIVE
+    // isoTheme branded colors — used by both Branded (Nim) and Baseline (Swift) variants
     static let current = AppTheme(
         primary: UIColor(red: 0x63/255.0, green: 0x66/255.0, blue: 0xF1/255.0, alpha: 1),     // #6366F1
         background: UIColor(red: 0xF8/255.0, green: 0xFA/255.0, blue: 0xFC/255.0, alpha: 1),   // #F8FAFC
@@ -26,6 +27,7 @@ struct AppTheme {
         inputBackground: UIColor(red: 0xF1/255.0, green: 0xF5/255.0, blue: 0xF9/255.0, alpha: 1) // #F1F5F9
     )
     #else
+    // Native: platform system colors
     static let current = AppTheme(
         primary: .systemBlue,
         background: .systemGroupedBackground,
@@ -46,7 +48,7 @@ struct BrandedDimensions {
     static let outerPadding: CGFloat = 16
     static let innerPadding: CGFloat = 12
     static let gap: CGFloat = 8
-    static let buttonRadius: CGFloat = 8
+    static let buttonRadius: CGFloat = 24  // circular (half of addButtonSize)
     static let checkboxRadius: CGFloat = 6
     static let filterPillRadius: CGFloat = 16
     static let titleFontSize: CGFloat = 32
@@ -66,9 +68,13 @@ struct BrandedDimensions {
 
 #if THEME_BRANDED
 
+// Nim-powered branded variant: thin Swift shell + isonim_start()
+// The entire UI is driven by the Nim library via CoreGraphics.
+
 // C function exported from Nim — drives the entire branded UI.
 @_silgen_name("isonim_start")
-func isonim_start(_ rootView: UnsafeMutableRawPointer, _ width: Double, _ height: Double)
+func isonim_start(_ rootView: UnsafeMutableRawPointer, _ width: Double, _ height: Double,
+                   _ safeTop: Double, _ safeBottom: Double)
 
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -89,16 +95,84 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         window?.rootViewController = vc
         window?.makeKeyAndVisible()
 
+        // Get safe area insets after window is visible
+        let safeInsets = window?.safeAreaInsets ?? .zero
+
         // Hand control to Nim
         let ptr = Unmanaged.passUnretained(rootView).toOpaque()
         let bounds = UIScreen.main.bounds
-        isonim_start(ptr, Double(bounds.width), Double(bounds.height))
+        isonim_start(ptr, Double(bounds.width), Double(bounds.height),
+                     Double(safeInsets.top), Double(safeInsets.bottom))
 
         return true
     }
 }
 
+#elseif THEME_NIM_NATIVE
+
+// Nim-powered native controls variant: thin Swift shell + isonim_native_start()
+// The entire UI is driven by Nim using native platform controls (UISwitch, etc.).
+
+@_silgen_name("isonim_native_start")
+func isonim_native_start(_ rootView: UnsafeMutableRawPointer, _ width: Double, _ height: Double,
+                          _ safeTop: Double, _ safeBottom: Double)
+
+@main
+class AppDelegate: UIResponder, UIApplicationDelegate {
+    var window: UIWindow?
+
+    func application(
+        _ application: UIApplication,
+        didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
+    ) -> Bool {
+        window = UIWindow(frame: UIScreen.main.bounds)
+        let rootView = UIView(frame: UIScreen.main.bounds)
+        rootView.backgroundColor = UIColor(
+            red: 0xF8/255.0, green: 0xFA/255.0,
+            blue: 0xFC/255.0, alpha: 1)  // isoTheme background
+
+        let vc = UIViewController()
+        vc.view = rootView
+        window?.rootViewController = vc
+        window?.makeKeyAndVisible()
+
+        // Get safe area insets after window is visible
+        let safeInsets = window?.safeAreaInsets ?? .zero
+
+        // Hand control to Nim (native controls variant)
+        let ptr = Unmanaged.passUnretained(rootView).toOpaque()
+        let bounds = UIScreen.main.bounds
+        isonim_native_start(ptr, Double(bounds.width), Double(bounds.height),
+                            Double(safeInsets.top), Double(safeInsets.bottom))
+
+        return true
+    }
+}
+
+#elseif THEME_BASELINE
+
+// Pure Swift baseline variant: isoTheme branded colors with full Swift UI.
+// Visually matches the Branded variant but without Nim — serves as a visual reference.
+
+@main
+class AppDelegate: UIResponder, UIApplicationDelegate {
+    var window: UIWindow?
+
+    func application(
+        _ application: UIApplication,
+        didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
+    ) -> Bool {
+        window = UIWindow(frame: UIScreen.main.bounds)
+        window?.rootViewController = UINavigationController(rootViewController: TaskManagerViewController())
+        window?.makeKeyAndVisible()
+        return true
+    }
+}
+
 #else
+
+// Native variant: pure Swift with platform system colors (UIKit defaults).
+// Shows the standard iOS look for comparison.
 
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -117,9 +191,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
 #endif
 
-#if !THEME_BRANDED
-// When THEME_BRANDED is set, Nim drives the entire UI via isonim_start().
-// The Swift task model and view controller below are only needed for the native variant.
+#if !THEME_BRANDED && !THEME_NIM_NATIVE
+// When THEME_BRANDED or THEME_NIM_NATIVE is set, Nim drives the entire UI.
+// The Swift task model and view controller below are needed for Baseline and Native variants.
 
 // MARK: - Task Model
 
@@ -161,8 +235,8 @@ class TaskCell: UITableViewCell {
     private let titleLabel = UILabel()
     private let deleteButton = UIButton(type: .system)
 
-    #if THEME_BRANDED
-    // Custom checkbox view for branded mode
+    #if THEME_BASELINE
+    // Custom checkbox view for branded style (used by Baseline variant)
     private let checkboxView = UIView()
     private let checkmarkLabel = UILabel()
     #endif
@@ -176,7 +250,7 @@ class TaskCell: UITableViewCell {
     required init?(coder: NSCoder) { fatalError() }
 
     private func setupViews() {
-        #if THEME_BRANDED
+        #if THEME_BASELINE
         // Custom checkbox: 28x28 rounded rect
         checkboxView.translatesAutoresizingMaskIntoConstraints = false
         checkboxView.layer.cornerRadius = BrandedDimensions.checkboxRadius
@@ -261,7 +335,7 @@ class TaskCell: UITableViewCell {
     }
 
     func configure(with task: Task) {
-        #if THEME_BRANDED
+        #if THEME_BASELINE
         titleLabel.text = task.title
         if task.isCompleted {
             checkboxView.backgroundColor = AppTheme.current.primary
@@ -307,7 +381,7 @@ class TaskManagerViewController: UIViewController {
 
     private let inputField = UITextField()
     private let addButton = UIButton(type: .system)
-    #if THEME_BRANDED
+    #if THEME_BASELINE
     // Branded: UIScrollView + stacked UIViews (not UITableView)
     private let scrollView = UIScrollView()
     private let stackView = UIStackView()
@@ -331,7 +405,7 @@ class TaskManagerViewController: UIViewController {
         super.viewDidLoad()
         title = "Tasks"
         view.backgroundColor = AppTheme.current.background
-        #if THEME_BRANDED
+        #if THEME_BASELINE
         // Branded: use explicit font size for title, matching isoTheme 32sp
         navigationController?.navigationBar.prefersLargeTitles = true
         if let appearance = navigationController?.navigationBar.standardAppearance {
@@ -366,7 +440,7 @@ class TaskManagerViewController: UIViewController {
         inputField.returnKeyType = .done
         inputField.delegate = self
 
-        #if THEME_BRANDED
+        #if THEME_BASELINE
         inputField.layer.cornerRadius = BrandedDimensions.buttonRadius
         inputField.font = .systemFont(ofSize: BrandedDimensions.bodyFontSize)
         inputField.textColor = AppTheme.current.textPrimary
@@ -387,7 +461,7 @@ class TaskManagerViewController: UIViewController {
         #endif
         container.addSubview(inputField)
 
-        #if THEME_BRANDED
+        #if THEME_BASELINE
         // Custom add button: 48x48 filled rounded rect with "+" text
         addButton.translatesAutoresizingMaskIntoConstraints = false
         addButton.backgroundColor = AppTheme.current.primary
@@ -411,7 +485,7 @@ class TaskManagerViewController: UIViewController {
         separator.backgroundColor = AppTheme.current.border
         container.addSubview(separator)
 
-        #if THEME_BRANDED
+        #if THEME_BASELINE
         NSLayoutConstraint.activate([
             container.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
             container.leadingAnchor.constraint(equalTo: view.leadingAnchor),
@@ -471,7 +545,7 @@ class TaskManagerViewController: UIViewController {
 
         guard let inputContainer = view.viewWithTag(100) else { return }
 
-        #if THEME_BRANDED
+        #if THEME_BASELINE
         // Branded: UIScrollView + stacked UIViews (not UITableView)
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         scrollView.alwaysBounceVertical = true
@@ -540,7 +614,7 @@ class TaskManagerViewController: UIViewController {
         topSep.backgroundColor = AppTheme.current.border
         bottomContainer.addSubview(topSep)
 
-        #if THEME_BRANDED
+        #if THEME_BASELINE
         // Custom filter pills: rounded buttons with 16pt radius
         let filterStack = UIStackView()
         filterStack.translatesAutoresizingMaskIntoConstraints = false
@@ -638,7 +712,7 @@ class TaskManagerViewController: UIViewController {
         refreshList()
     }
 
-    #if THEME_BRANDED
+    #if THEME_BASELINE
     @objc private func filterPillTapped(_ sender: UIButton) {
         currentFilter = TaskFilter(rawValue: sender.tag) ?? .all
         updateFilterPillAppearance()
@@ -795,7 +869,7 @@ class TaskManagerViewController: UIViewController {
         let empty = filteredTasks.isEmpty
         emptyLabel.isHidden = !empty
 
-        #if THEME_BRANDED
+        #if THEME_BASELINE
         scrollView.isHidden = empty
         #else
         tableView.isHidden = empty
@@ -820,8 +894,8 @@ class TaskManagerViewController: UIViewController {
     }
 }
 
-#if !THEME_BRANDED
-// MARK: - UITableViewDataSource & Delegate
+#if !THEME_BASELINE
+// MARK: - UITableViewDataSource & Delegate (Native variant only; Baseline uses stack view)
 
 extension TaskManagerViewController: UITableViewDataSource, UITableViewDelegate {
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
@@ -863,4 +937,4 @@ extension TaskManagerViewController: UITextFieldDelegate {
     }
 }
 
-#endif // !THEME_BRANDED
+#endif // !THEME_BRANDED && !THEME_NIM_NATIVE

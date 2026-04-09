@@ -77,7 +77,19 @@ proc uiSetBorderColor*(view: Id; r, g, b, a: cdouble) =
   if (layer) {
     void* cgColor = ((void*(*)(id, SEL))objc_msgSend)(color, sel_registerName("CGColor"));
     ((void(*)(id, SEL, void*))objc_msgSend)(layer, sel_registerName("setBorderColor:"), cgColor);
-    ((void(*)(id, SEL, double))objc_msgSend)(layer, sel_registerName("setBorderWidth:"), 1.5);
+    // Set default border width of 1 if none was explicitly set
+    double existingWidth = ((double(*)(id, SEL))objc_msgSend)(layer, sel_registerName("borderWidth"));
+    if (existingWidth == 0.0) {
+      ((void(*)(id, SEL, double))objc_msgSend)(layer, sel_registerName("setBorderWidth:"), 1.0);
+    }
+  }
+  """.}
+
+proc uiSetBorderWidth*(view: Id; width: cdouble) =
+  {.emit: """
+  id layer = ((id(*)(id, SEL))objc_msgSend)(`view`, sel_registerName("layer"));
+  if (layer) {
+    ((void(*)(id, SEL, double))objc_msgSend)(layer, sel_registerName("setBorderWidth:"), `width`);
   }
   """.}
 
@@ -121,15 +133,35 @@ proc uiSetFontSize*(view: Id; size: cdouble) =
   let font = msgSend(Id(cls("UIFont")), sel("systemFontOfSize:"), size)
   msgSendVoid(view, sel("setFont:"), font)
 
+proc uiSetBoldFontSize*(view: Id; size: cdouble) =
+  let font = msgSend(Id(cls("UIFont")), sel("boldSystemFontOfSize:"), size)
+  msgSendVoid(view, sel("setFont:"), font)
+
+proc uiSetTextAlignment*(view: Id; alignment: cint) =
+  ## Set NSTextAlignment: 0=left, 1=center, 2=right, 3=justified, 4=natural
+  uikitMsgSendVoidInt(view, sel("setTextAlignment:"), alignment)
+
 # ---------------------------------------------------------------------------
 # UITextField
 # ---------------------------------------------------------------------------
 
 proc uiTextFieldNew*(): Id =
-  ## Create a UITextField.
+  ## Create a UITextField with no default border (styled by renderer).
   result = allocInit("UITextField")
-  # Set border style to rounded rect
-  uikitMsgSendVoidInt(result, sel("setBorderStyle:"), 3)  # UITextBorderStyleRoundedRect
+  # UITextBorderStyleNone — let branded_ui handle styling via setStyle
+  uikitMsgSendVoidInt(result, sel("setBorderStyle:"), 0)
+  # Add left padding (12pt inset view)
+  {.emit: """
+  id paddingView = ((id(*)(id, SEL))objc_msgSend)(
+    (id)objc_getClass("UIView"), sel_registerName("alloc"));
+  CGRect paddingRect = {{0, 0}, {12, 1}};
+  paddingView = ((id(*)(id, SEL, CGRect))objc_msgSend)(paddingView,
+    sel_registerName("initWithFrame:"), paddingRect);
+  ((void(*)(id, SEL, id))objc_msgSend)(`result`,
+    sel_registerName("setLeftView:"), paddingView);
+  ((void(*)(id, SEL, int))objc_msgSend)(`result`,
+    sel_registerName("setLeftViewMode:"), 3); // UITextFieldViewModeAlways
+  """.}
 
 proc uiTextFieldGetText*(tf: Id): string =
   toNimString(msgSend(tf, sel("text")))
@@ -154,3 +186,147 @@ proc uiAddTapGesture*(view: Id; target: Id; action: Sel) =
   let initd = msgSend(recognizer, sel("initWithTarget:action:"), target, Id(action))
   msgSendVoid(view, sel("addGestureRecognizer:"), initd)
   uiSetUserInteractionEnabled(view, true)
+
+# ---------------------------------------------------------------------------
+# UIButton
+# ---------------------------------------------------------------------------
+
+proc uiButtonNew*(title: string = ""): Id =
+  ## Create a UIButton (system type).
+  {.emit: """
+  `result` = ((id(*)(id, SEL, int))objc_msgSend)(
+    (id)objc_getClass("UIButton"),
+    sel_registerName("buttonWithType:"), 1); // UIButtonTypeSystem = 1
+  """.}
+  if title.len > 0:
+    let nsStr = toNSString(title)
+    msgSendVoid(result, sel("setTitle:forState:"), nsStr, Id(nil))
+    release(nsStr)
+
+proc uiButtonSetTitle*(btn: Id; title: string) =
+  let nsStr = toNSString(title)
+  {.emit: """
+  ((void(*)(id, SEL, id, unsigned long))objc_msgSend)(
+    `btn`, sel_registerName("setTitle:forState:"), `nsStr`, 0); // UIControlStateNormal
+  """.}
+  release(nsStr)
+
+proc uiButtonGetTitle*(btn: Id): string =
+  {.emit: """
+  id titleLabel = ((id(*)(id, SEL))objc_msgSend)(`btn`, sel_registerName("titleLabel"));
+  id nsText = ((id(*)(id, SEL))objc_msgSend)(titleLabel, sel_registerName("text"));
+  """.}
+  var nsText {.importc, nodecl.}: Id
+  toNimString(nsText)
+
+proc uiButtonAddTarget*(btn: Id; target: Id; action: Sel) =
+  ## Add target-action for UIControlEventTouchUpInside (1 << 6 = 64).
+  {.emit: """
+  ((void(*)(id, SEL, id, SEL, unsigned long))objc_msgSend)(
+    `btn`, sel_registerName("addTarget:action:forControlEvents:"),
+    `target`, `action`, (1UL << 6));
+  """.}
+
+proc uiButtonSetEnabled*(btn: Id; enabled: bool) =
+  uikitMsgSendVoidBool(btn, sel("setEnabled:"), enabled)
+
+proc uiButtonSetFontSize*(btn: Id; size: cdouble) =
+  ## Set the font size of a UIButton's titleLabel.
+  {.emit: """
+  id titleLabel = ((id(*)(id, SEL))objc_msgSend)(`btn`, sel_registerName("titleLabel"));
+  if (titleLabel) {
+    id font = ((id(*)(id, SEL, double))objc_msgSend)(
+      (id)objc_getClass("UIFont"), sel_registerName("systemFontOfSize:"), `size`);
+    ((void(*)(id, SEL, id))objc_msgSend)(titleLabel, sel_registerName("setFont:"), font);
+  }
+  """.}
+
+proc uiButtonSetTitleColor*(btn: Id; r, g, b, a: cdouble) =
+  ## Set the title color for UIControlStateNormal.
+  {.emit: """
+  id color = ((id(*)(id, SEL, double, double, double, double))objc_msgSend)(
+    (id)objc_getClass("UIColor"),
+    sel_registerName("colorWithRed:green:blue:alpha:"),
+    `r`, `g`, `b`, `a`);
+  ((void(*)(id, SEL, id, unsigned long))objc_msgSend)(
+    `btn`, sel_registerName("setTitleColor:forState:"), color, 0); // UIControlStateNormal
+  """.}
+
+# ---------------------------------------------------------------------------
+# UISwitch
+# ---------------------------------------------------------------------------
+
+proc uiSwitchNew*(): Id =
+  ## Create a UISwitch via [[UISwitch alloc] init].
+  allocInit("UISwitch")
+
+proc uiSwitchSetOn*(sw: Id; on: bool) =
+  uikitMsgSendVoidBool(sw, sel("setOn:"), on)
+
+proc uiSwitchIsOn*(sw: Id): bool =
+  {.emit: """
+  `result` = ((_Bool(*)(id, SEL))objc_msgSend)(`sw`, sel_registerName("isOn"));
+  """.}
+
+proc uiSwitchAddTarget*(sw: Id; target: Id; action: Sel) =
+  ## Add target-action for UIControlEventValueChanged (1 << 12 = 4096).
+  {.emit: """
+  ((void(*)(id, SEL, id, SEL, unsigned long))objc_msgSend)(
+    `sw`, sel_registerName("addTarget:action:forControlEvents:"),
+    `target`, `action`, (1UL << 12));
+  """.}
+
+# ---------------------------------------------------------------------------
+# UISegmentedControl
+# ---------------------------------------------------------------------------
+
+proc uiSegmentedControlNew*(items: seq[string]): Id =
+  ## Create a UISegmentedControl with the given segment titles.
+  # Build NSArray of NSStrings
+  var nsItems: seq[Id]
+  for s in items:
+    nsItems.add(toNSString(s))
+
+  let nsArray = msgSend(Id(cls("NSMutableArray")), sel("alloc"))
+  let nsArrayInit = msgSend(nsArray, sel("init"))
+
+  for ns in nsItems:
+    msgSendVoid(nsArrayInit, sel("addObject:"), ns)
+    release(ns)
+
+  result = msgSend(Id(cls("UISegmentedControl")), sel("alloc"))
+  result = msgSend(result, sel("initWithItems:"), nsArrayInit)
+
+proc uiSegmentedControlSetSegments*(sc: Id; items: seq[string]) =
+  ## Remove all segments and add new ones.
+  {.emit: """
+  ((void(*)(id, SEL))objc_msgSend)(`sc`, sel_registerName("removeAllSegments"));
+  """.}
+  for i, s in items:
+    let nsStr = toNSString(s)
+    {.emit: """
+    ((void(*)(id, SEL, id, unsigned long, _Bool))objc_msgSend)(
+      `sc`, sel_registerName("insertSegmentWithTitle:atIndex:animated:"),
+      `nsStr`, (unsigned long)`i`, 0);
+    """.}
+    release(nsStr)
+
+proc uiSegmentedControlSetSelectedIndex*(sc: Id; index: cint) =
+  {.emit: """
+  ((void(*)(id, SEL, long))objc_msgSend)(
+    `sc`, sel_registerName("setSelectedSegmentIndex:"), (long)`index`);
+  """.}
+
+proc uiSegmentedControlGetSelectedIndex*(sc: Id): cint =
+  {.emit: """
+  `result` = (int)((long(*)(id, SEL))objc_msgSend)(
+    `sc`, sel_registerName("selectedSegmentIndex"));
+  """.}
+
+proc uiSegmentedControlAddTarget*(sc: Id; target: Id; action: Sel) =
+  ## Add target-action for UIControlEventValueChanged.
+  {.emit: """
+  ((void(*)(id, SEL, id, SEL, unsigned long))objc_msgSend)(
+    `sc`, sel_registerName("addTarget:action:forControlEvents:"),
+    `target`, `action`, (1UL << 12));
+  """.}

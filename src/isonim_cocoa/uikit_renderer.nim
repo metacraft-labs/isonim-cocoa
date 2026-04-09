@@ -4,17 +4,25 @@
 ## properties, and events to UITapGestureRecognizer callbacks.
 ## Minimal implementation sufficient for branded_ui.nim.
 
-import std/[tables, strutils]
+import std/[tables, strutils, hashes]
 import isonim_cocoa/objc_runtime
 import isonim_cocoa/foundation
 import isonim_cocoa/uikit/views
 import isonim/theming/theme
+import isonim/layout/layout_engine
 
 export objc_runtime.Id
+
+proc hash*(e: Id): Hash =
+  ## Hash for Id (distinct pointer) — needed for reconcileArrays tables.
+  hash(cast[pointer](e))
 
 type
   UIKitRenderer* = object
     ## Renderer backend that creates and manipulates UIKit views.
+    ## When engine is non-nil, all element operations are also registered
+    ## in a parallel Yoga layout tree for flexbox computation.
+    engine*: LayoutEngine
 
   UIKitElement* = Id
     ## An element handle is just an ObjC object (UIView subclass).
@@ -29,6 +37,9 @@ type
     uekLabel      # UILabel (text display)
     uekInput      # UITextField (editable text)
     uekText       # UILabel (text node from createTextNode)
+    uekButton     # UIButton (system button)
+    uekSwitch     # UISwitch (toggle)
+    uekSegmented  # UISegmentedControl
 
   UIElementInfo = object
     kind: UIElementKind
@@ -37,6 +48,8 @@ type
     children: seq[UIKitElement]
     attributes: Table[string, string]
     eventCallbacks: Table[string, int32]
+    fontWeight: string     # "bold", "normal", etc.
+    fontSize: float        # last set font-size (0 = not set)
 
 var uiElements: Table[pointer, UIElementInfo]
 
@@ -160,10 +173,29 @@ proc applyUIStyle(elem: UIKitElement; prop, value: string) =
     if inf != nil and inf.kind in {uekLabel, uekText, uekInput}:
       let (r, g, b, a) = parseHexColor(resolved)
       uiSetTextColor(view, r, g, b, a)
+    elif inf != nil and inf.kind == uekButton:
+      let (r, g, b, a) = parseHexColor(resolved)
+      uiButtonSetTitleColor(view, r, g, b, a)
   of "font-size":
     if inf != nil and inf.kind in {uekLabel, uekText, uekInput}:
       let size = try: parseFloat(value.replace("px", "").strip()) except: 17.0
-      uiSetFontSize(view, size)
+      inf.fontSize = size
+      if inf.fontWeight == "bold":
+        uiSetBoldFontSize(view, size)
+      else:
+        uiSetFontSize(view, size)
+    elif inf != nil and inf.kind == uekButton:
+      let size = try: parseFloat(value.replace("px", "").strip()) except: 17.0
+      inf.fontSize = size
+      uiButtonSetFontSize(view, size)
+  of "font-weight":
+    if inf != nil and inf.kind in {uekLabel, uekText, uekInput}:
+      inf.fontWeight = value
+      if inf.fontSize > 0:
+        if value == "bold":
+          uiSetBoldFontSize(view, inf.fontSize)
+        else:
+          uiSetFontSize(view, inf.fontSize)
   of "border-radius":
     let radius = try: parseFloat(resolved.replace("px", "").strip()) except: 0.0
     uiSetCornerRadius(view, radius)
@@ -171,6 +203,17 @@ proc applyUIStyle(elem: UIKitElement; prop, value: string) =
   of "border-color":
     let (r, g, b, a) = parseHexColor(resolved)
     uiSetBorderColor(view, r, g, b, a)
+  of "border-width":
+    let width = try: parseFloat(value.replace("px", "").strip()) except: 1.0
+    uiSetBorderWidth(view, width)
+  of "text-align":
+    if inf != nil and inf.kind in {uekLabel, uekText}:
+      let align: cint = case value
+        of "center": 1
+        of "right": 2
+        of "justified": 3
+        else: 0  # left
+      uiSetTextAlignment(view, align)
   of "opacity":
     let alpha = try: parseFloat(value) except: 1.0
     uiSetAlpha(view, alpha)
@@ -186,17 +229,37 @@ proc createElement*(r: UIKitRenderer; tag: string): UIKitElement =
   of "input":
     result = UIKitElement(uiTextFieldNew())
     discard ensureUIInfo(result, uekInput, tag)
+  of "button":
+    result = UIKitElement(uiButtonNew())
+    discard ensureUIInfo(result, uekButton, tag)
+  of "switch":
+    result = UIKitElement(uiSwitchNew())
+    discard ensureUIInfo(result, uekSwitch, tag)
+  of "segmented":
+    # Create a real UISegmentedControl — segments are set via the "segments" attribute
+    result = UIKitElement(uiSegmentedControlNew(@[]))
+    discard ensureUIInfo(result, uekSegmented, tag)
   of "span", "p", "label", "h1", "h2", "h3", "h4", "h5", "h6":
     result = UIKitElement(uiLabelNew())
-    discard ensureUIInfo(result, uekLabel, tag)
+    let inf = ensureUIInfo(result, uekLabel, tag)
+    # h1 gets bold large font by default
+    if tag == "h1":
+      inf.fontSize = 28.0
+      inf.fontWeight = "bold"
+      uiSetBoldFontSize(Id(result), 28.0)
   else:
     # Everything else is a UIView container
     result = UIKitElement(uiViewNew())
     discard ensureUIInfo(result, uekView, tag)
+  # Register in layout engine if present
+  if r.engine != nil:
+    discard r.engine.registerNode(cast[int64](cast[pointer](result)))
 
 proc createTextNode*(r: UIKitRenderer; text: string): UIKitElement =
   result = UIKitElement(uiLabelNew(text))
   discard ensureUIInfo(result, uekText, "#text")
+  if r.engine != nil:
+    discard r.engine.registerNode(cast[int64](cast[pointer](result)))
 
 proc appendChild*(r: UIKitRenderer; parent, child: UIKitElement) =
   uiAddSubview(Id(parent), Id(child))
@@ -206,6 +269,9 @@ proc appendChild*(r: UIKitRenderer; parent, child: UIKitElement) =
     pi.children.add(child)
   if ci != nil:
     ci.parent = parent
+  if r.engine != nil:
+    r.engine.addChild(cast[int64](cast[pointer](parent)),
+                       cast[int64](cast[pointer](child)))
 
 proc insertBefore*(r: UIKitRenderer; parent, child, reference: UIKitElement) =
   let pi = uiInfo(parent)
@@ -220,6 +286,10 @@ proc insertBefore*(r: UIKitRenderer; parent, child, reference: UIKitElement) =
     if ci != nil:
       ci.parent = parent
   uiAddSubview(Id(parent), Id(child))
+  if r.engine != nil:
+    r.engine.insertChildBefore(cast[int64](cast[pointer](parent)),
+                                cast[int64](cast[pointer](child)),
+                                cast[int64](cast[pointer](reference)))
 
 proc removeChild*(r: UIKitRenderer; parent, child: UIKitElement) =
   uiRemoveFromSuperview(Id(child))
@@ -232,6 +302,9 @@ proc removeChild*(r: UIKitRenderer; parent, child: UIKitElement) =
   let ci = uiInfo(child)
   if ci != nil:
     ci.parent = UIKitElement(Id(nil))
+  if r.engine != nil:
+    r.engine.removeChild(cast[int64](cast[pointer](parent)),
+                          cast[int64](cast[pointer](child)))
 
 proc setAttribute*(r: UIKitRenderer; node: UIKitElement; name, value: string) =
   let inf = uiInfo(node)
@@ -246,6 +319,25 @@ proc setAttribute*(r: UIKitRenderer; node: UIKitElement; name, value: string) =
       uiTextFieldSetText(Id(node), value)
     elif inf != nil and inf.kind in {uekLabel, uekText}:
       uiLabelSetText(Id(node), value)
+  of "checked":
+    if inf != nil and inf.kind == uekSwitch:
+      uiSwitchSetOn(Id(node), value == "true")
+  of "enabled":
+    if inf != nil and inf.kind == uekButton:
+      uiButtonSetEnabled(Id(node), value != "false")
+  of "selected":
+    discard  # Visual selection state handled by style
+  of "segments":
+    if inf != nil and inf.kind == uekSegmented:
+      # Comma-separated segment labels
+      var items: seq[string]
+      for s in value.split(","):
+        items.add(s.strip())
+      uiSegmentedControlSetSegments(Id(node), items)
+  of "selectedIndex":
+    if inf != nil and inf.kind == uekSegmented:
+      let idx = try: parseInt(value) except: 0
+      uiSegmentedControlSetSelectedIndex(Id(node), cint(idx))
   else:
     discard
 
@@ -256,6 +348,8 @@ proc removeAttribute*(r: UIKitRenderer; node: UIKitElement; name: string) =
 
 proc getAttribute*(r: UIKitRenderer; node: UIKitElement; name: string): string =
   let inf = uiInfo(node)
+  if inf != nil and inf.kind == uekSegmented and name == "selectedIndex":
+    return $uiSegmentedControlGetSelectedIndex(Id(node))
   if inf != nil and name in inf.attributes:
     inf.attributes[name]
   else:
@@ -267,6 +361,8 @@ proc setTextContent*(r: UIKitRenderer; node: UIKitElement; text: string) =
     uiLabelSetText(Id(node), text)
   elif inf != nil and inf.kind == uekInput:
     uiTextFieldSetText(Id(node), text)
+  elif inf != nil and inf.kind == uekButton:
+    uiButtonSetTitle(Id(node), text)
 
 proc textContent*(r: UIKitRenderer; node: UIKitElement): string =
   let inf = uiInfo(node)
@@ -274,11 +370,15 @@ proc textContent*(r: UIKitRenderer; node: UIKitElement): string =
     uiLabelGetText(Id(node))
   elif inf != nil and inf.kind == uekInput:
     uiTextFieldGetText(Id(node))
+  elif inf != nil and inf.kind == uekButton:
+    uiButtonGetTitle(Id(node))
   else:
     ""
 
 proc setStyle*(r: UIKitRenderer; node: UIKitElement; prop, value: string) =
   applyUIStyle(node, prop, value)
+  if r.engine != nil:
+    r.engine.setLayoutStyle(cast[int64](cast[pointer](node)), prop, value)
 
 proc addEventListener*(r: UIKitRenderer; node: UIKitElement; event: string;
                         handler: proc()) =
@@ -290,8 +390,18 @@ proc addEventListener*(r: UIKitRenderer; node: UIKitElement; event: string;
 
   case event
   of "click":
-    # Use UITapGestureRecognizer for all views
-    uiAddTapGesture(Id(node), target, sel("callbackAction:"))
+    if inf != nil and inf.kind == uekButton:
+      # UIButton uses target-action (TouchUpInside)
+      uiButtonAddTarget(Id(node), target, sel("callbackAction:"))
+    elif inf != nil and inf.kind == uekSwitch:
+      # UISwitch uses target-action (ValueChanged)
+      uiSwitchAddTarget(Id(node), target, sel("callbackAction:"))
+    elif inf != nil and inf.kind == uekSegmented:
+      # UISegmentedControl uses target-action (ValueChanged)
+      uiSegmentedControlAddTarget(Id(node), target, sel("callbackAction:"))
+    else:
+      # UITapGestureRecognizer for generic views
+      uiAddTapGesture(Id(node), target, sel("callbackAction:"))
   else:
     discard
 

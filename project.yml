@@ -10,23 +10,11 @@ options:
 settings:
   base:
     DEVELOPMENT_TEAM: GK3D7BH967
+    CODE_SIGN_STYLE: Automatic
+    COMPILER_INDEX_STORE_ENABLE: NO
 
 targets:
-  IsoNimCocoa-Native:
-    type: application
-    platform: iOS
-    sources:
-      - path: ios-app/Sources
-    settings:
-      base:
-        INFOPLIST_FILE: ios-app/Info.plist
-        PRODUCT_BUNDLE_IDENTIFIER: com.metacraft.isonim.cocoa.native
-        SWIFT_ACTIVE_COMPILATION_CONDITIONS: THEME_NATIVE
-        PRODUCT_NAME: "Tasks Native"
-        PRODUCT_MODULE_NAME: IsoNimCocoa_iOS
-    dependencies: []
-
-  IsoNimCocoa-Branded:
+  IsoNim-Branded:
     type: application
     platform: iOS
     sources:
@@ -36,10 +24,54 @@ targets:
         INFOPLIST_FILE: ios-app/Info.plist
         PRODUCT_BUNDLE_IDENTIFIER: com.metacraft.isonim.cocoa.branded
         SWIFT_ACTIVE_COMPILATION_CONDITIONS: THEME_BRANDED
-        PRODUCT_NAME: "Tasks IsoNim"
+        PRODUCT_NAME: "IsoNim Branded"
         PRODUCT_MODULE_NAME: IsoNimCocoa_iOS
         OTHER_LDFLAGS: ["-lisonim_app", "-lobjc", "-lc++"]
         LIBRARY_SEARCH_PATHS: ["$(PROJECT_DIR)/build"]
+    dependencies: []
+
+  IsoNim-NimNative:
+    type: application
+    platform: iOS
+    sources:
+      - path: ios-app/Sources
+    settings:
+      base:
+        INFOPLIST_FILE: ios-app/Info.plist
+        PRODUCT_BUNDLE_IDENTIFIER: com.metacraft.isonim.cocoa.nimnative
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: THEME_NIM_NATIVE
+        PRODUCT_NAME: "IsoNim NimNative"
+        PRODUCT_MODULE_NAME: IsoNimCocoa_iOS
+        OTHER_LDFLAGS: ["-lisonim_native", "-lobjc", "-lc++"]
+        LIBRARY_SEARCH_PATHS: ["$(PROJECT_DIR)/build"]
+    dependencies: []
+
+  IsoNim-Baseline:
+    type: application
+    platform: iOS
+    sources:
+      - path: ios-app/Sources
+    settings:
+      base:
+        INFOPLIST_FILE: ios-app/Info.plist
+        PRODUCT_BUNDLE_IDENTIFIER: com.metacraft.isonim.cocoa
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: THEME_BASELINE
+        PRODUCT_NAME: "IsoNim Baseline"
+        PRODUCT_MODULE_NAME: IsoNimCocoa_iOS
+    dependencies: []
+
+  IsoNim-Native:
+    type: application
+    platform: iOS
+    sources:
+      - path: ios-app/Sources
+    settings:
+      base:
+        INFOPLIST_FILE: ios-app/Info.plist
+        PRODUCT_BUNDLE_IDENTIFIER: com.metacraft.isonim.cocoa.native
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: THEME_NATIVE
+        PRODUCT_NAME: "IsoNim Native"
+        PRODUCT_MODULE_NAME: IsoNimCocoa_iOS
     dependencies: []
 
   IsoNimCocoa-Tests:
@@ -50,23 +82,35 @@ targets:
     settings:
       base:
         INFOPLIST_FILE: ios-app/Tests/Info.plist
-        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Tasks Native.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Tasks Native"
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/IsoNim Native.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/IsoNim Native"
         BUNDLE_LOADER: "$(TEST_HOST)"
     dependencies:
-      - target: IsoNimCocoa-Native
+      - target: IsoNim-Native
 
 schemes:
+  Branded:
+    build:
+      targets:
+        IsoNim-Branded: all
+    test:
+      targets: []
+  NimNative:
+    build:
+      targets:
+        IsoNim-NimNative: all
+    test:
+      targets: []
+  Baseline:
+    build:
+      targets:
+        IsoNim-Baseline: all
+    test:
+      targets: []
   Native:
     build:
       targets:
-        IsoNimCocoa-Native: all
+        IsoNim-Native: all
         IsoNimCocoa-Tests: [test]
     test:
       targets:
         - IsoNimCocoa-Tests
-  Branded:
-    build:
-      targets:
-        IsoNimCocoa-Branded: all
-    test:
-      targets: []
