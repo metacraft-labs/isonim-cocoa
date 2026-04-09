@@ -1,0 +1,502 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		2700972353ED2C227F0F3AE0 /* IsoNimCocoaTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEE1119BE7E3C98E9708D753 /* IsoNimCocoaTests.swift */; };
+		448C08BC4EEB1F5D55A5C278 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4176954EACBE95249382A9A4 /* AppDelegate.swift */; };
+		48109D8DA1E4F18336ACBA92 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4176954EACBE95249382A9A4 /* AppDelegate.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		27C3C53388C795F2D63AEE87 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = FF369DCFDC2CEBC7F2728373 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 52C892E18EE1A66B6028303B;
+			remoteInfo = "IsoNimCocoa-Native";
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		03FC6272C241169982E2B33F /* IsoNimCocoa-Tests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = "IsoNimCocoa-Tests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		13D89B3BA2096CF1E17BED47 /* IsoNimCocoa-Native.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = "IsoNimCocoa-Native.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		4176954EACBE95249382A9A4 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		EE4DE2DD552C52E81B5BD6E2 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		EEE1119BE7E3C98E9708D753 /* IsoNimCocoaTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IsoNimCocoaTests.swift; sourceTree = "<group>"; };
+		F03D028553A85D10AD15208C /* IsoNimCocoa-Branded.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = "IsoNimCocoa-Branded.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		0079B99E324AF5E72B5B445D /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				4176954EACBE95249382A9A4 /* AppDelegate.swift */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		34D15698E523E2E3EABD0B90 /* ios-app */ = {
+			isa = PBXGroup;
+			children = (
+				0079B99E324AF5E72B5B445D /* Sources */,
+				CE23D8628A82189518DF8F85 /* Tests */,
+			);
+			path = "ios-app";
+			sourceTree = "<group>";
+		};
+		CE23D8628A82189518DF8F85 /* Tests */ = {
+			isa = PBXGroup;
+			children = (
+				EE4DE2DD552C52E81B5BD6E2 /* Info.plist */,
+				EEE1119BE7E3C98E9708D753 /* IsoNimCocoaTests.swift */,
+			);
+			path = Tests;
+			sourceTree = "<group>";
+		};
+		DA36FB6874E7D0C019C484A7 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				F03D028553A85D10AD15208C /* IsoNimCocoa-Branded.app */,
+				13D89B3BA2096CF1E17BED47 /* IsoNimCocoa-Native.app */,
+				03FC6272C241169982E2B33F /* IsoNimCocoa-Tests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		EF634041B56347EDE8654B67 = {
+			isa = PBXGroup;
+			children = (
+				34D15698E523E2E3EABD0B90 /* ios-app */,
+				DA36FB6874E7D0C019C484A7 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		52C892E18EE1A66B6028303B /* IsoNimCocoa-Native */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = EB56ABDEDB7C91EBABAE0361 /* Build configuration list for PBXNativeTarget "IsoNimCocoa-Native" */;
+			buildPhases = (
+				384E8A0D57DE5C0A9B1F7445 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "IsoNimCocoa-Native";
+			packageProductDependencies = (
+			);
+			productName = "IsoNimCocoa-Native";
+			productReference = 13D89B3BA2096CF1E17BED47 /* IsoNimCocoa-Native.app */;
+			productType = "com.apple.product-type.application";
+		};
+		60891631875E8CC7DF861926 /* IsoNimCocoa-Branded */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AEFD5CA9C4201B2E81555F00 /* Build configuration list for PBXNativeTarget "IsoNimCocoa-Branded" */;
+			buildPhases = (
+				D2B6127948EB90015DA33B11 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "IsoNimCocoa-Branded";
+			packageProductDependencies = (
+			);
+			productName = "IsoNimCocoa-Branded";
+			productReference = F03D028553A85D10AD15208C /* IsoNimCocoa-Branded.app */;
+			productType = "com.apple.product-type.application";
+		};
+		82BB10DA029D21A3F06FF2D0 /* IsoNimCocoa-Tests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 72FA1A4A1680618B61CE0390 /* Build configuration list for PBXNativeTarget "IsoNimCocoa-Tests" */;
+			buildPhases = (
+				EDCD1E615C9DEB1A6C03D3D1 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				A7CB9B230E15BF8F41F677B4 /* PBXTargetDependency */,
+			);
+			name = "IsoNimCocoa-Tests";
+			packageProductDependencies = (
+			);
+			productName = "IsoNimCocoa-Tests";
+			productReference = 03FC6272C241169982E2B33F /* IsoNimCocoa-Tests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		FF369DCFDC2CEBC7F2728373 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1600;
+				TargetAttributes = {
+					52C892E18EE1A66B6028303B = {
+						DevelopmentTeam = GK3D7BH967;
+					};
+					60891631875E8CC7DF861926 = {
+						DevelopmentTeam = GK3D7BH967;
+					};
+					82BB10DA029D21A3F06FF2D0 = {
+						DevelopmentTeam = GK3D7BH967;
+					};
+				};
+			};
+			buildConfigurationList = B3A52C2EDE376CC853BB1FC5 /* Build configuration list for PBXProject "IsoNimCocoa" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = EF634041B56347EDE8654B67;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				60891631875E8CC7DF861926 /* IsoNimCocoa-Branded */,
+				52C892E18EE1A66B6028303B /* IsoNimCocoa-Native */,
+				82BB10DA029D21A3F06FF2D0 /* IsoNimCocoa-Tests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		384E8A0D57DE5C0A9B1F7445 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				448C08BC4EEB1F5D55A5C278 /* AppDelegate.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D2B6127948EB90015DA33B11 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				48109D8DA1E4F18336ACBA92 /* AppDelegate.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		EDCD1E615C9DEB1A6C03D3D1 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				2700972353ED2C227F0F3AE0 /* IsoNimCocoaTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		A7CB9B230E15BF8F41F677B4 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 52C892E18EE1A66B6028303B /* IsoNimCocoa-Native */;
+			targetProxy = 27C3C53388C795F2D63AEE87 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		17F1DDEC20D4227585A4C770 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_FILE = "ios-app/Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.metacraft.isonim.cocoa.native;
+				PRODUCT_MODULE_NAME = IsoNimCocoa_iOS;
+				PRODUCT_NAME = "Tasks Native";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = THEME_NATIVE;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		271A6A50A5D3357A719DA7B1 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				INFOPLIST_FILE = "ios-app/Tests/Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "com.metacraft.isonim.IsoNimCocoa-Tests";
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Tasks Native.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Tasks Native";
+			};
+			name = Debug;
+		};
+		55414F1BB51D80E3DCF01C9B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_FILE = "ios-app/Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				LIBRARY_SEARCH_PATHS = (
+					"$(PROJECT_DIR)/build",
+				);
+				OTHER_LDFLAGS = (
+					"-lisonim_app",
+					"-lobjc",
+					"-lc++",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.metacraft.isonim.cocoa.branded;
+				PRODUCT_MODULE_NAME = IsoNimCocoa_iOS;
+				PRODUCT_NAME = "Tasks IsoNim";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = THEME_BRANDED;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		6CFC7A518208748B41C63765 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_FILE = "ios-app/Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				LIBRARY_SEARCH_PATHS = (
+					"$(PROJECT_DIR)/build",
+				);
+				OTHER_LDFLAGS = (
+					"-lisonim_app",
+					"-lobjc",
+					"-lc++",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.metacraft.isonim.cocoa.branded;
+				PRODUCT_MODULE_NAME = IsoNimCocoa_iOS;
+				PRODUCT_NAME = "Tasks IsoNim";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = THEME_BRANDED;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		99165C443EC73D7CB60F7E2F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = GK3D7BH967;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		CBB4FBAE2487EE354B29F0CC /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				INFOPLIST_FILE = "ios-app/Tests/Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "com.metacraft.isonim.IsoNimCocoa-Tests";
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Tasks Native.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Tasks Native";
+			};
+			name = Release;
+		};
+		CC8730232FC125E529D91DAA /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_FILE = "ios-app/Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.metacraft.isonim.cocoa.native;
+				PRODUCT_MODULE_NAME = IsoNimCocoa_iOS;
+				PRODUCT_NAME = "Tasks Native";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = THEME_NATIVE;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		D2940A4688CC066C6440EDBB /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = GK3D7BH967;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		72FA1A4A1680618B61CE0390 /* Build configuration list for PBXNativeTarget "IsoNimCocoa-Tests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				271A6A50A5D3357A719DA7B1 /* Debug */,
+				CBB4FBAE2487EE354B29F0CC /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		AEFD5CA9C4201B2E81555F00 /* Build configuration list for PBXNativeTarget "IsoNimCocoa-Branded" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				6CFC7A518208748B41C63765 /* Debug */,
+				55414F1BB51D80E3DCF01C9B /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		B3A52C2EDE376CC853BB1FC5 /* Build configuration list for PBXProject "IsoNimCocoa" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				99165C443EC73D7CB60F7E2F /* Debug */,
+				D2940A4688CC066C6440EDBB /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		EB56ABDEDB7C91EBABAE0361 /* Build configuration list for PBXNativeTarget "IsoNimCocoa-Native" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				CC8730232FC125E529D91DAA /* Debug */,
+				17F1DDEC20D4227585A4C770 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = FF369DCFDC2CEBC7F2728373 /* Project object */;
+}

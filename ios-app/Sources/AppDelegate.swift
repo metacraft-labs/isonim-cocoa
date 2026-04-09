@@ -64,6 +64,42 @@ struct BrandedDimensions {
     static let deleteIconSize: CGFloat = 20
 }
 
+#if THEME_BRANDED
+
+// C function exported from Nim — drives the entire branded UI.
+@_silgen_name("isonim_start")
+func isonim_start(_ rootView: UnsafeMutableRawPointer, _ width: Double, _ height: Double)
+
+@main
+class AppDelegate: UIResponder, UIApplicationDelegate {
+    var window: UIWindow?
+
+    func application(
+        _ application: UIApplication,
+        didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
+    ) -> Bool {
+        window = UIWindow(frame: UIScreen.main.bounds)
+        let rootView = UIView(frame: UIScreen.main.bounds)
+        rootView.backgroundColor = UIColor(
+            red: 0xF8/255.0, green: 0xFA/255.0,
+            blue: 0xFC/255.0, alpha: 1)  // isoTheme background
+
+        let vc = UIViewController()
+        vc.view = rootView
+        window?.rootViewController = vc
+        window?.makeKeyAndVisible()
+
+        // Hand control to Nim
+        let ptr = Unmanaged.passUnretained(rootView).toOpaque()
+        let bounds = UIScreen.main.bounds
+        isonim_start(ptr, Double(bounds.width), Double(bounds.height))
+
+        return true
+    }
+}
+
+#else
+
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
@@ -78,6 +114,12 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         return true
     }
 }
+
+#endif
+
+#if !THEME_BRANDED
+// When THEME_BRANDED is set, Nim drives the entire UI via isonim_start().
+// The Swift task model and view controller below are only needed for the native variant.
 
 // MARK: - Task Model
 
@@ -820,3 +862,5 @@ extension TaskManagerViewController: UITextFieldDelegate {
         return true
     }
 }
+
+#endif // !THEME_BRANDED

@@ -151,8 +151,20 @@ deploy-native: xcode-generate
     ios-deploy --bundle "$APP" --justlaunch 2>&1 | tail -3
     echo "Native app deployed"
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Nim static library (for branded variant)
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Build Nim branded app as static library for iOS device (ARM64)
+build-nim-ios:
+    ./build-nim-ios.sh device
+
+# Build Nim branded app as static library for iOS Simulator
+build-nim-sim:
+    ./build-nim-ios.sh sim
+
 # Deploy branded (IsoNim theme) app to iPhone
-deploy-branded: xcode-generate
+deploy-branded: build-nim-ios xcode-generate
     #!/usr/bin/env bash
     set -euo pipefail
     /usr/bin/env -i HOME="$HOME" USER="$USER" TMPDIR="${TMPDIR:-/tmp}" \

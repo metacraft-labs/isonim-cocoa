@@ -212,6 +212,13 @@ type
     origin*: CGPoint
     size*: CGSize
 
+proc msgSendVoidCGRect*(self: Id; op: Sel; rect: CGRect) =
+  ## Send a message with one CGRect argument.
+  ## On ARM64, CGRect (4 doubles) fits in registers so objc_msgSend is used.
+  {.emit: """
+  ((void(*)(id, SEL, CGRect))objc_msgSend)((id)`self`, (SEL)`op`, `rect`);
+  """.}
+
 proc msgSendCGRect*(self: Id; op: Sel): CGRect =
   ## Return a CGRect from an objc_msgSend call.
   ## On ARM64, CGRect fits in registers so objc_msgSend (not _stret) is used.

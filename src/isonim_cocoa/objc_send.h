@@ -84,4 +84,10 @@
 /* ---- 1 SEL + 1 id args -> _Bool (for sendAction:to:) ---- */
 #define nim_msg_bool_sel_id ((_Bool(*)(id, SEL, SEL, id))objc_msgSend)
 
+/* ---- 1 double + 1 long args -> void (for setPosition:ofDividerAtIndex:) ---- */
+#define nim_msg_void_double_long ((void(*)(id, SEL, double, long))objc_msgSend)
+
+/* ---- 1 CGRect arg -> void (for setFrame:) ---- */
+#define nim_msg_void_1_cgrect ((void(*)(id, SEL, CGRect))objc_msgSend)
+
 #endif /* ISONIM_OBJC_SEND_H */

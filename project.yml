@@ -38,6 +38,8 @@ targets:
         SWIFT_ACTIVE_COMPILATION_CONDITIONS: THEME_BRANDED
         PRODUCT_NAME: "Tasks IsoNim"
         PRODUCT_MODULE_NAME: IsoNimCocoa_iOS
+        OTHER_LDFLAGS: ["-lisonim_app", "-lobjc", "-lc++"]
+        LIBRARY_SEARCH_PATHS: ["$(PROJECT_DIR)/build"]
     dependencies: []
 
   IsoNimCocoa-Tests:
