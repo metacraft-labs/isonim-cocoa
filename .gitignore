@@ -4,3 +4,5 @@ nimcache/
 *.dSYM/
 build/
 .DS_Store
+xcuserdata/
+*.xcuserstate
