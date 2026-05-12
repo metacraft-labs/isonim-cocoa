@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  nim-tests:
+    name: Nim tests (macOS)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/checkout@v4
+        with:
+          repository: metacraft-labs/isonim
+          path: ../isonim
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+
+      - name: nim check (renderer — AppKit surface)
+        run: nix develop -c bash -c "nim check src/isonim_cocoa/renderer.nim"
+
+      - name: Run ObjC runtime tests
+        run: nix develop -c bash -c "just test-objc"
+
+      - name: Run AppKit view tests
+        run: nix develop -c bash -c "just test-views"
+
+      - name: Run renderer tests
+        run: nix develop -c bash -c "just test-renderer"
+
+      - name: Run test infrastructure tests
+        run: nix develop -c bash -c "just test-infra"
+
+      - name: Run cross-renderer compatibility tests
+        run: nix develop -c bash -c "just test-cross"
+
+      - name: Run branded scenario snapshots
+        run: nix develop -c bash -c "just test-scenarios"
+
+      # The task-manager demo's end-to-end test lives in
+      # `isonim-examples/tests/test_cocoa_leaves_macos_only.nim` since
+      # EX-M5 (the standalone `demos/task-manager/src/main.nim` was
+      # deleted alongside the duplicated source). Cross-renderer
+      # parity (TUI / web / GPUI / Freya / Cocoa) is covered in
+      # `isonim-examples/tests/test_vm_parity_across_renderers.nim`.
+      # Cross-repo CI gating happens in the `isonim-examples`
+      # workflow; this repo only verifies the renderer + bindings +
+      # AppKit surface here.

@@ -56,6 +56,22 @@ test: test-objc test-views test-renderer test-infra
 test-all: test test-cross test-scenarios
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Task-app demo (canonical home in isonim-examples since EX-M5)
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Build the canonical task-app demo (lives in isonim-examples since
+# EX-M5; this recipe just defers to that repo's composition root).
+# Cocoa needs no Rust shim — AppKit is linked directly via the
+# `{.passL: "-framework AppKit".}` pragmas inside isonim_cocoa.
+demo-build:
+    nim c --path:../isonim/src --path:../isonim-examples --path:../isonim-cocoa/src --nimcache:nimcache/demo ../isonim-examples/task_app/main_cocoa.nim
+
+# Run the canonical task-app demo (headless mode). Sources live in
+# `isonim-examples/task_app/` per the EX-M5 migration.
+demo-run:
+    nim c -r --path:../isonim/src --path:../isonim-examples --path:../isonim-cocoa/src --nimcache:nimcache/demo ../isonim-examples/task_app/main_cocoa.nim
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Xcode project (generated via XcodeGen)
 # ─────────────────────────────────────────────────────────────────────────────
 
