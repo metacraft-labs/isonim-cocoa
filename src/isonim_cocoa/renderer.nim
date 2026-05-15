@@ -81,6 +81,7 @@ type
     drawerState: DrawerState              # only used for ekDrawer
     drawerEdge: DrawerEdge                # only used for ekDrawer
     navStackState: NavStackState          # only used for ekNavStack
+    hasExplicitBackground*: bool          # true once setStyle("background-color", …) ran
 
 var elements: Table[pointer, ElementInfo]
 
@@ -358,6 +359,12 @@ proc applyStyle(elem: CocoaElement; prop, value: string) =
       ((void(*)(id, SEL, void*))objc_msgSend)(layer, sel_registerName("setBackgroundColor:"), cgColor);
     }
     """.}
+    # M-EVP-14 round-3: signal to the headless-capture adapter that
+    # this view already has a leaf-driven background colour. The
+    # adapter's vertical-stack layout pass uses this flag to skip
+    # its neutral-tint default and let the explicit colour win.
+    if inf != nil:
+      inf.hasExplicitBackground = true
   of "color":
     if inf != nil and inf.kind in {ekText, ekLabel, ekInput, ekSearch, ekSecureInput}:
       let (r, g, b, a) = parseHexColor(resolved)
@@ -788,6 +795,16 @@ proc childCount*(r: CocoaRenderer; node: CocoaElement): int =
   let inf = info(node)
   if inf != nil: inf.children.len
   else: 0
+
+proc hasExplicitBackground*(r: CocoaRenderer; node: CocoaElement): bool =
+  ## Returns true if the leaf set ``background-color`` on ``node`` via
+  ## ``setStyle``. Used by the headless-capture adapter
+  ## (``isonim-render-serve``) to suppress its neutral-tint default
+  ## when an explicit colour is already in place — M-EVP-14 round-3
+  ## fix for the "depth-keyed indigo overrides leaf styles" bug.
+  let inf = info(node)
+  if inf != nil: inf.hasExplicitBackground
+  else: false
 
 proc textContent*(r: CocoaRenderer; node: CocoaElement): string =
   let inf = info(node)
