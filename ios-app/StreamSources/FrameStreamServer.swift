@@ -82,8 +82,15 @@ final class FrameStreamServer {
     }
 
     private func accept(_ conn: NWConnection) {
-        conn.stateUpdateHandler = { [weak self, weak conn] state in
-            guard let self, let conn else { return }
+        // Hold conn strongly inside the state handler. NWListener hands
+        // the connection to us, but nothing else strong-references it —
+        // if we capture `[weak conn]` here, ARC tears the connection
+        // down before its state machine reaches `.ready`, so the
+        // `.ready` branch never fires and `activeClientCount` stays at
+        // zero. Capturing `conn` strongly keeps it alive until we drop
+        // it from `connections` on `.failed` / `.cancelled`.
+        conn.stateUpdateHandler = { [weak self] state in
+            guard let self else { return }
             switch state {
             case .ready:
                 os_log("FrameStreamServer client connected", log: self.log, type: .info)
