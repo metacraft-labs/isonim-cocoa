@@ -201,6 +201,132 @@ deploy-branded: build-nim-ios xcode-generate
 # Deploy both variants to iPhone
 deploy-both: deploy-native deploy-branded
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Stream variant — IsoNim editor pbIos backend device side
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# The Stream scheme builds a sibling iOS app that boots the Nim branded
+# UI *and* publishes an F-packet TCP listener on port 8200, advertised
+# over Bonjour as `_isonim-stream._tcp.`. The editor's pbIos launcher
+# (host side, work in progress) discovers and connects to it.
+#
+# Pipeline: build-nim-ios (libisonim_app.a) → xcodegen → xcodebuild
+# Stream → devicectl install / launch.
+
+# Stream-specific iPhone identifier (iPhone 14, "iPhone").
+# Override on the CLI: `just stream-device=DC8C... deploy-stream`.
+stream-device := "688D4B24-9EDF-51E3-B343-F351DE814897"
+stream-bundle := "com.metacraft.isonim.cocoa.stream"
+stream-port := "8200"
+
+# Build the Stream variant for device (ARM64, signed). Mirrors
+# `deploy-branded`'s prelude: Nim → C → static lib → xcodebuild.
+build-stream: build-nim-ios xcode-generate
+    #!/usr/bin/env bash
+    set -euo pipefail
+    /usr/bin/env -i HOME="$HOME" USER="$USER" TMPDIR="${TMPDIR:-/tmp}" \
+      PATH="/usr/bin:/bin:/usr/sbin:/sbin" \
+      DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
+      /usr/bin/xcodebuild build \
+        -project IsoNimCocoa.xcodeproj \
+        -target IsoNim-Stream \
+        -configuration Debug \
+        DEVELOPMENT_TEAM=GK3D7BH967 \
+        -destination 'generic/platform=iOS' \
+        -allowProvisioningUpdates 2>&1 | tail -3
+    APP=$(find build -name "IsoNim Stream.app" -path "*/Debug-iphoneos/*" | head -1)
+    echo "Built: $APP"
+
+# Install + launch Stream on the connected iPhone via xcrun devicectl
+# (the modern replacement for ios-deploy; works with iOS 17+).
+deploy-stream: build-stream
+    #!/usr/bin/env bash
+    set -euo pipefail
+    APP=$(find build -name "IsoNim Stream.app" -path "*/Debug-iphoneos/*" | head -1)
+    if [ -z "$APP" ]; then
+      echo "Error: IsoNim Stream.app not found." >&2
+      exit 1
+    fi
+    DEVICE_ID="{{stream-device}}"
+    echo "Installing $APP onto $DEVICE_ID..."
+    xcrun devicectl device install app \
+      --device "$DEVICE_ID" "$APP" 2>&1 | tail -5
+    echo "Launching {{stream-bundle}}..."
+    if ! xcrun devicectl device process launch \
+        --device "$DEVICE_ID" --terminate-existing \
+        {{stream-bundle}} 2>&1 | tail -5; then
+      echo "" >&2
+      echo "NOTE: launch denied — this is usually the per-bundle trust" >&2
+      echo "prompt for a NEW bundle ID. On the iPhone open" >&2
+      echo "  Settings > General > VPN & Device Management" >&2
+      echo "and trust the developer profile for team GK3D7BH967, then" >&2
+      echo "tap the IsoNim Stream icon on the home screen once." >&2
+      exit 1
+    fi
+    echo "Stream app deployed and launched on iPhone."
+    echo "Look up the device's IP and try: just test-stream-frame ip=<ip>"
+
+# Smoke test: open TCP to the device on port 8200, read ONE F-packet's
+# header, dump width/height/length. Caller supplies the device IP via
+# `ip=...` (default `iPhone.local` which works if the Mac and the iPhone
+# share the same Wi-Fi). The test exits non-zero if the packet doesn't
+# decode cleanly.
+test-stream-frame ip="iPhone.local":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    PYTHON=$(command -v python3 || command -v python)
+    if [ -z "$PYTHON" ]; then
+      echo "Error: python3 not available; needed to decode the F header." >&2
+      exit 1
+    fi
+    HOST="{{ip}}"
+    PORT="{{stream-port}}"
+    echo "Connecting to $HOST:$PORT..."
+    # The script body lives in a temp file because Just normalizes recipe
+    # indentation, which would otherwise break Python's significant
+    # whitespace inside a HEREDOC.
+    SCRIPT=$(mktemp /tmp/test-stream-frame.XXXXXX.py)
+    trap 'rm -f "$SCRIPT"' EXIT
+    cat >"$SCRIPT" <<'PYEOF'
+    import socket, struct, sys
+    host, port = sys.argv[1], int(sys.argv[2])
+    sock = socket.create_connection((host, port), timeout=15)
+    sock.settimeout(15)
+    def recv_exact(n):
+        buf = b""
+        while len(buf) < n:
+            chunk = sock.recv(n - len(buf))
+            if not chunk:
+                raise SystemExit(f"socket closed after {len(buf)}/{n} bytes")
+            buf += chunk
+        return buf
+    hdr = recv_exact(14)
+    if hdr[0:1] != b'F':
+        raise SystemExit(f"bad tag: {hdr[0:1]!r} (expected b'F')")
+    flags = hdr[1]
+    width, height, length = struct.unpack('<III', hdr[2:14])
+    expected = width * height * 4
+    print(f"tag       = 'F'")
+    print(f"flags     = {flags:#04x}")
+    print(f"width     = {width}")
+    print(f"height    = {height}")
+    print(f"length    = {length}")
+    print(f"w*h*4     = {expected}")
+    if flags != 0:
+        raise SystemExit(f"unexpected flags {flags:#04x}; expected 0x00")
+    if length != expected:
+        raise SystemExit(f"length mismatch: header={length} w*h*4={expected}")
+    payload = recv_exact(length)
+    if length >= 4:
+        r, g, b, a = payload[0], payload[1], payload[2], payload[3]
+        print(f"px[0,0]   = R={r} G={g} B={b} A={a}")
+    print("PASS: first F-packet matches header invariants.")
+    PYEOF
+    # Strip Just's leading indentation (4 spaces) so Python sees a clean
+    # top-level script.
+    sed -i.bak 's/^    //' "$SCRIPT"
+    "$PYTHON" "$SCRIPT" "$HOST" "$PORT"
+
 # Run XCTests on connected device
 test-device: xcode-generate
     /usr/bin/env -i HOME="$HOME" USER="$USER" TMPDIR="${TMPDIR:-/tmp}" \

@@ -74,6 +74,27 @@ targets:
         PRODUCT_MODULE_NAME: IsoNimCocoa_iOS
     dependencies: []
 
+  # Stream variant: Nim branded UI + TCP F-packet listener on port 8200
+  # for the editor's pbIos launcher to dial into. Sibling of Branded —
+  # links against libisonim_app.a (same Nim entry point) but does NOT
+  # share Sources/ with the other variants (StreamAppDelegate has its
+  # own @main and would collide).
+  IsoNim-Stream:
+    type: application
+    platform: iOS
+    sources:
+      - path: ios-app/StreamSources
+    settings:
+      base:
+        INFOPLIST_FILE: ios-app/StreamSources/Info.plist
+        PRODUCT_BUNDLE_IDENTIFIER: com.metacraft.isonim.cocoa.stream
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: THEME_STREAM
+        PRODUCT_NAME: "IsoNim Stream"
+        PRODUCT_MODULE_NAME: IsoNimCocoa_iOS_Stream
+        OTHER_LDFLAGS: ["-lisonim_app", "-lobjc", "-lc++"]
+        LIBRARY_SEARCH_PATHS: ["$(PROJECT_DIR)/build"]
+    dependencies: []
+
   IsoNimCocoa-Tests:
     type: bundle.unit-test
     platform: iOS
@@ -114,3 +135,9 @@ schemes:
     test:
       targets:
         - IsoNimCocoa-Tests
+  Stream:
+    build:
+      targets:
+        IsoNim-Stream: all
+    test:
+      targets: []

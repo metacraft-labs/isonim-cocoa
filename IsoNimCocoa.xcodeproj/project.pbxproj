@@ -8,10 +8,13 @@
 
 /* Begin PBXBuildFile section */
 		2700972353ED2C227F0F3AE0 /* IsoNimCocoaTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEE1119BE7E3C98E9708D753 /* IsoNimCocoaTests.swift */; };
+		27E024A6A83FD09DAE45044F /* StreamAppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D545B677F09D123A9B0E005 /* StreamAppDelegate.swift */; };
 		4D0733A61D579CAB0B489FF9 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4176954EACBE95249382A9A4 /* AppDelegate.swift */; };
+		568E3978E892DBE009C565CD /* FrameStreamingViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F24E6B67D3D41659D944EE8D /* FrameStreamingViewController.swift */; };
 		61149E254B32C3D8EA2063B6 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4176954EACBE95249382A9A4 /* AppDelegate.swift */; };
 		6A956794B6434189221826D1 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4176954EACBE95249382A9A4 /* AppDelegate.swift */; };
 		943B5651849A25AD47F0394A /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4176954EACBE95249382A9A4 /* AppDelegate.swift */; };
+		AD445DA0D30FD791E08DD829 /* FrameStreamServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = E43039EB267E3DFB5ECC40E3 /* FrameStreamServer.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -27,11 +30,16 @@
 /* Begin PBXFileReference section */
 		03FC6272C241169982E2B33F /* IsoNimCocoa-Tests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = "IsoNimCocoa-Tests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		12ECE38ED6035AE57DC67D63 /* IsoNim-Branded.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = "IsoNim-Branded.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		3D545B677F09D123A9B0E005 /* StreamAppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamAppDelegate.swift; sourceTree = "<group>"; };
 		4176954EACBE95249382A9A4 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		890A4CDAB8DD03A990DB48C4 /* IsoNim-Native.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = "IsoNim-Native.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		92AA098D300029530F9E841B /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		AF592B222717F62C5BB324C1 /* IsoNim-NimNative.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = "IsoNim-NimNative.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		CDC29A749B240F872C370D66 /* IsoNim-Stream.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = "IsoNim-Stream.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		E43039EB267E3DFB5ECC40E3 /* FrameStreamServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrameStreamServer.swift; sourceTree = "<group>"; };
 		EE4DE2DD552C52E81B5BD6E2 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		EEE1119BE7E3C98E9708D753 /* IsoNimCocoaTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IsoNimCocoaTests.swift; sourceTree = "<group>"; };
+		F24E6B67D3D41659D944EE8D /* FrameStreamingViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrameStreamingViewController.swift; sourceTree = "<group>"; };
 		F5C716794F04E1F69423592B /* IsoNim-Baseline.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = "IsoNim-Baseline.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -48,6 +56,7 @@
 			isa = PBXGroup;
 			children = (
 				0079B99E324AF5E72B5B445D /* Sources */,
+				E701AE9401E47C9D74639C40 /* StreamSources */,
 				CE23D8628A82189518DF8F85 /* Tests */,
 			);
 			path = "ios-app";
@@ -69,9 +78,21 @@
 				12ECE38ED6035AE57DC67D63 /* IsoNim-Branded.app */,
 				890A4CDAB8DD03A990DB48C4 /* IsoNim-Native.app */,
 				AF592B222717F62C5BB324C1 /* IsoNim-NimNative.app */,
+				CDC29A749B240F872C370D66 /* IsoNim-Stream.app */,
 				03FC6272C241169982E2B33F /* IsoNimCocoa-Tests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		E701AE9401E47C9D74639C40 /* StreamSources */ = {
+			isa = PBXGroup;
+			children = (
+				F24E6B67D3D41659D944EE8D /* FrameStreamingViewController.swift */,
+				E43039EB267E3DFB5ECC40E3 /* FrameStreamServer.swift */,
+				92AA098D300029530F9E841B /* Info.plist */,
+				3D545B677F09D123A9B0E005 /* StreamAppDelegate.swift */,
+			);
+			path = StreamSources;
 			sourceTree = "<group>";
 		};
 		EF634041B56347EDE8654B67 = {
@@ -137,6 +158,23 @@
 			productReference = 03FC6272C241169982E2B33F /* IsoNimCocoa-Tests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
+		BE7377B390F58A5830728584 /* IsoNim-Stream */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 89F42021D79602279B823C40 /* Build configuration list for PBXNativeTarget "IsoNim-Stream" */;
+			buildPhases = (
+				2E3A2CB6F67B390FA7C3B483 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "IsoNim-Stream";
+			packageProductDependencies = (
+			);
+			productName = "IsoNim-Stream";
+			productReference = CDC29A749B240F872C370D66 /* IsoNim-Stream.app */;
+			productType = "com.apple.product-type.application";
+		};
 		DBE0FC056EE04951324ED319 /* IsoNim-Baseline */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = AF3FB00FBFD4A563950AB267 /* Build configuration list for PBXNativeTarget "IsoNim-Baseline" */;
@@ -192,6 +230,10 @@
 						DevelopmentTeam = GK3D7BH967;
 						ProvisioningStyle = Automatic;
 					};
+					BE7377B390F58A5830728584 = {
+						DevelopmentTeam = GK3D7BH967;
+						ProvisioningStyle = Automatic;
+					};
 					DBE0FC056EE04951324ED319 = {
 						DevelopmentTeam = GK3D7BH967;
 						ProvisioningStyle = Automatic;
@@ -220,6 +262,7 @@
 				356916F31937E03236275550 /* IsoNim-Branded */,
 				DC7F0379ACA1FAA0A52538F1 /* IsoNim-Native */,
 				3DA8A8FE143ADCFE24124552 /* IsoNim-NimNative */,
+				BE7377B390F58A5830728584 /* IsoNim-Stream */,
 				82BB10DA029D21A3F06FF2D0 /* IsoNimCocoa-Tests */,
 			);
 		};
@@ -247,6 +290,16 @@
 			buildActionMask = 2147483647;
 			files = (
 				6A956794B6434189221826D1 /* AppDelegate.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		2E3A2CB6F67B390FA7C3B483 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AD445DA0D30FD791E08DD829 /* FrameStreamServer.swift in Sources */,
+				568E3978E892DBE009C565CD /* FrameStreamingViewController.swift in Sources */,
+				27E024A6A83FD09DAE45044F /* StreamAppDelegate.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -424,6 +477,33 @@
 			};
 			name = Debug;
 		};
+		92867970D06BA0640905D0D0 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_FILE = "ios-app/StreamSources/Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				LIBRARY_SEARCH_PATHS = (
+					"$(PROJECT_DIR)/build",
+				);
+				OTHER_LDFLAGS = (
+					"-lisonim_app",
+					"-lobjc",
+					"-lc++",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.metacraft.isonim.cocoa.stream;
+				PRODUCT_MODULE_NAME = IsoNimCocoa_iOS_Stream;
+				PRODUCT_NAME = "IsoNim Stream";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = THEME_STREAM;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
 		99165C443EC73D7CB60F7E2F /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -517,6 +597,33 @@
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Debug;
+		};
+		B04CB6ACB557A15516E7E8F5 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_FILE = "ios-app/StreamSources/Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				LIBRARY_SEARCH_PATHS = (
+					"$(PROJECT_DIR)/build",
+				);
+				OTHER_LDFLAGS = (
+					"-lisonim_app",
+					"-lobjc",
+					"-lc++",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.metacraft.isonim.cocoa.stream;
+				PRODUCT_MODULE_NAME = IsoNimCocoa_iOS_Stream;
+				PRODUCT_NAME = "IsoNim Stream";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = THEME_STREAM;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
 		};
 		CBB4FBAE2487EE354B29F0CC /* Release */ = {
 			isa = XCBuildConfiguration;
@@ -648,6 +755,15 @@
 			buildConfigurations = (
 				271A6A50A5D3357A719DA7B1 /* Debug */,
 				CBB4FBAE2487EE354B29F0CC /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		89F42021D79602279B823C40 /* Build configuration list for PBXNativeTarget "IsoNim-Stream" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				92867970D06BA0640905D0D0 /* Debug */,
+				B04CB6ACB557A15516E7E8F5 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
