@@ -14,6 +14,23 @@ import isonim_cocoa/appkit/views
 
 {.passL: "-framework AppKit".}
 
+# Ensure the C file that backs this module's inline `{.emit:}`
+# blocks (``setFrame``, ``setFrameOrigin``, ``setFrameSize``,
+# ``setEdgeInsets``, and the anchor-with-constant constraint
+# constructors) sees the AppKit / ObjC headers that declare
+# ``CGRect``, ``id``, ``SEL`` and ``objc_msgSend`` /
+# ``sel_registerName``. Without this, any caller that actually
+# uses one of those procs (e.g. M-EVP-14's cocoa_adapter layout
+# pass) triggers a wall of "use of undeclared identifier"
+# errors because the per-module C file otherwise pulls in only
+# ``nimbase.h``. (The non-emit procs in this module compile
+# fine via ``{.importc, header: objcSendH.}`` indirectly through
+# the imported modules above.)
+{.emit: """
+#include <CoreGraphics/CGGeometry.h>
+#include <objc/message.h>
+""".}
+
 # ---------------------------------------------------------------------------
 # Disable autoresizing mask (required before adding Auto Layout constraints)
 # ---------------------------------------------------------------------------
