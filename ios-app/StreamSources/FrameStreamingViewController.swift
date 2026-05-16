@@ -40,6 +40,17 @@ final class FrameStreamingViewController: UIViewController {
                      Double(bounds.width), Double(bounds.height),
                      Double(insets.top), Double(insets.bottom))
 
+        // Keep the screen awake while the Stream app is foregrounded. iOS
+        // would otherwise dim → lock → background the app, which both
+        // tears down the NWListener (host TCP connect refused) AND pauses
+        // the CADisplayLink (no frames even if reconnected). With the
+        // idle timer disabled the device stays awake until the user
+        // switches apps or presses the side button explicitly — making
+        // "tap the IsoNim Stream icon once" enough to keep the host
+        // screenshot tool's pipeline reliable for the rest of the
+        // session.
+        UIApplication.shared.isIdleTimerDisabled = true
+
         // Start the stream server *after* Nim has laid out subviews so the
         // first frame the host sees is non-empty.
         FrameStreamServer.shared.start(port: 8200)
@@ -70,6 +81,13 @@ final class FrameStreamingViewController: UIViewController {
 
     deinit {
         displayLink?.invalidate()
+        // Hygiene: re-enable the idle timer when the VC tears down.
+        // FrameStreamingViewController is the singleton root in the
+        // Stream scheme so this normally never fires, but pairing the
+        // disable in `viewDidLoad` with a matching enable here keeps the
+        // app well-behaved if the VC ever gets re-mounted (e.g. for a
+        // future "settings" screen swap).
+        UIApplication.shared.isIdleTimerDisabled = false
     }
 
     @objc private func tick() {
