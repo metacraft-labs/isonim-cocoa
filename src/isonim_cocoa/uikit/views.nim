@@ -155,6 +155,33 @@ proc uiSetTextAlignment*(view: Id; alignment: cint) =
   ## Set NSTextAlignment: 0=left, 1=center, 2=right, 3=justified, 4=natural
   uikitMsgSendVoidInt(view, sel("setTextAlignment:"), alignment)
 
+proc uiLabelSizeThatFits*(label: Id; maxWidth, maxHeight: cdouble): CGSize =
+  ## Ask a UILabel for the size it would prefer to occupy when given the
+  ## supplied (width, height) constraint. Used by the renderer to push a
+  ## text-intrinsic height into Yoga so labels actually take up space in
+  ## the layout pass (UILabel has no implicit Yoga measure callback —
+  ## without this, every label resolves to 0x0 and the iOS frame
+  ## flushing pass skips it).
+  ##
+  ## Implemented as a `sizeToFit` + frame read-back rather than a direct
+  ## `sizeThatFits:` msgSend: the latter returns a `CGSize` and the
+  ## struct-return ABI on ARM64 routes through a different objc_msgSend
+  ## variant depending on struct size, whereas `setFrame:` /
+  ## `frame` are already known-working in this codebase
+  ## (`msgSendCGRect` ships in `objc_runtime.nim`). We seed the label
+  ## with a large bounding frame so `sizeToFit` clamps to the natural
+  ## intrinsic content size rather than to a stale zero-sized frame.
+  {.emit: """
+  CGRect bigFrame = { {0.0, 0.0}, { (CGFloat)`maxWidth`, (CGFloat)`maxHeight` } };
+  ((void(*)(id, SEL, CGRect))objc_msgSend)(
+    (id)`label`, sel_registerName("setFrame:"), bigFrame);
+  ((void(*)(id, SEL))objc_msgSend)(
+    (id)`label`, sel_registerName("sizeToFit"));
+  CGRect fitted = ((CGRect(*)(id, SEL))objc_msgSend)(
+    (id)`label`, sel_registerName("frame"));
+  `result` = fitted.size;
+  """.}
+
 # ---------------------------------------------------------------------------
 # UITextField
 # ---------------------------------------------------------------------------
@@ -253,6 +280,26 @@ proc uiButtonSetFontSize*(btn: Id; size: cdouble) =
       (id)objc_getClass("UIFont"), sel_registerName("systemFontOfSize:"), `size`);
     ((void(*)(id, SEL, id))objc_msgSend)(titleLabel, sel_registerName("setFont:"), font);
   }
+  """.}
+
+proc uiButtonSizeThatFits*(btn: Id; maxWidth, maxHeight: cdouble): CGSize =
+  ## Ask a UIButton for the size it would prefer when constrained to
+  ## (maxWidth, maxHeight). Used by the renderer to compute an intrinsic
+  ## height for buttons whose title fits naturally — matches the
+  ## measure-into-Yoga pattern `uiLabelSizeThatFits` uses for UILabel.
+  ##
+  ## Same `sizeToFit` + `frame` read-back idiom as `uiLabelSizeThatFits`
+  ## — see that proc for why we avoid the direct `sizeThatFits:`
+  ## struct-return msgSend.
+  {.emit: """
+  CGRect bigFrame = { {0.0, 0.0}, { (CGFloat)`maxWidth`, (CGFloat)`maxHeight` } };
+  ((void(*)(id, SEL, CGRect))objc_msgSend)(
+    (id)`btn`, sel_registerName("setFrame:"), bigFrame);
+  ((void(*)(id, SEL))objc_msgSend)(
+    (id)`btn`, sel_registerName("sizeToFit"));
+  CGRect fitted = ((CGRect(*)(id, SEL))objc_msgSend)(
+    (id)`btn`, sel_registerName("frame"));
+  `result` = fitted.size;
   """.}
 
 proc uiButtonSetTitleColor*(btn: Id; r, g, b, a: cdouble) =

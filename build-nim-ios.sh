@@ -90,6 +90,9 @@ nim c \
   -d:release \
   --opt:size \
   --passC:"-DIOS_TARGET" \
+  --path:"src" \
+  --path:"../isonim/src" \
+  --path:"../nim-everywhere/src" \
   src/isonim_cocoa/app_entry.nim
 
 echo "==> Nim -> C done."

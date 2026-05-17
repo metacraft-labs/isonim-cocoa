@@ -50,6 +50,10 @@ type
     eventCallbacks: Table[string, int32]
     fontWeight: string     # "bold", "normal", etc.
     fontSize: float        # last set font-size (0 = not set)
+    explicitWidth: bool    # true once a non-zero width style is pushed
+    explicitHeight: bool   # true once a non-zero height style is pushed
+    intrinsicWidth: float  # last text-measured width (0 = none)
+    intrinsicHeight: float # last text-measured height (0 = none)
 
 var uiElements: Table[pointer, UIElementInfo]
 
@@ -147,6 +151,46 @@ proc resolveStyleValue(prop, value: string): string =
     if r >= 0: $r else: value
   else:
     value
+
+# ===========================================================================
+# Text-intrinsic sizing
+# ===========================================================================
+
+proc refreshTextIntrinsicSize*(r: UIKitRenderer; elem: UIKitElement) =
+  ## Re-measure a label / text / button view and push the resulting
+  ## intrinsic size into the Yoga layout engine as `min-width` and
+  ## `min-height` constraints. Without this, Yoga has no measure
+  ## callback for UILabel and resolves every text view to 0x0, which
+  ## then gets skipped by the iOS `applyLayout` frame-flush loop
+  ## (which requires width > 0 and height > 0). The result on the
+  ## device is invisible text — the bug Wave J left behind for the
+  ## settings demo.
+  ##
+  ## We push `min-width` / `min-height` (rather than fixed `width` /
+  ## `height`) so user-supplied explicit sizes still win. Cross-axis
+  ## stretch (Yoga's default `align-items: stretch`) keeps labels
+  ## filling their parent column horizontally even when the measured
+  ## width is small.
+  if r.engine == nil: return
+  let inf = uiInfo(elem)
+  if inf == nil: return
+  if inf.kind notin {uekLabel, uekText, uekButton}: return
+  # Generous upper bound so wrapping doesn't kick in during measure;
+  # parent flex will still constrain the painted frame.
+  let measured =
+    case inf.kind
+    of uekLabel, uekText: uiLabelSizeThatFits(Id(elem), 10000.0, 10000.0)
+    of uekButton: uiButtonSizeThatFits(Id(elem), 10000.0, 10000.0)
+    else: CGSize(width: 0, height: 0)
+  let w = float(measured.width)
+  let h = float(measured.height)
+  inf.intrinsicWidth = w
+  inf.intrinsicHeight = h
+  let handle = cast[int64](cast[pointer](elem))
+  if not inf.explicitWidth and w > 0:
+    r.engine.setLayoutStyle(handle, "min-width", $w)
+  if not inf.explicitHeight and h > 0:
+    r.engine.setLayoutStyle(handle, "min-height", $h)
 
 # ===========================================================================
 # Style application
@@ -359,10 +403,12 @@ proc setTextContent*(r: UIKitRenderer; node: UIKitElement; text: string) =
   let inf = uiInfo(node)
   if inf != nil and inf.kind in {uekLabel, uekText}:
     uiLabelSetText(Id(node), text)
+    r.refreshTextIntrinsicSize(node)
   elif inf != nil and inf.kind == uekInput:
     uiTextFieldSetText(Id(node), text)
   elif inf != nil and inf.kind == uekButton:
     uiButtonSetTitle(Id(node), text)
+    r.refreshTextIntrinsicSize(node)
 
 proc textContent*(r: UIKitRenderer; node: UIKitElement): string =
   let inf = uiInfo(node)
@@ -375,10 +421,38 @@ proc textContent*(r: UIKitRenderer; node: UIKitElement): string =
   else:
     ""
 
+proc parseDimensionFast(value: string): float =
+  ## Strip ``px`` / ``dp`` units and parse the remainder as a float,
+  ## returning 0 for anything non-numeric. Same fast-path guard as
+  ## `layout_engine.parseLayoutFloat` so the ARM64 release-build
+  ## ValueError leak that motivated Wave J's `parseLayoutFloat`
+  ## refactor cannot bite the renderer either.
+  let stripped = value.replace("px", "").replace("dp", "").strip()
+  if stripped.len == 0: return 0.0
+  let first = stripped[0]
+  if first notin {'0'..'9', '-', '+', '.'}: return 0.0
+  try: parseFloat(stripped) except ValueError: 0.0
+
 proc setStyle*(r: UIKitRenderer; node: UIKitElement; prop, value: string) =
   applyUIStyle(node, prop, value)
   if r.engine != nil:
     r.engine.setLayoutStyle(cast[int64](cast[pointer](node)), prop, value)
+  # Track whether the leaf has pushed an explicit width / height. The
+  # text-intrinsic measure pass only seeds `min-width` / `min-height`
+  # when the leaf hasn't already set a hard size, so explicit sizing
+  # (e.g. the number-stepper buttons' 40x40 frame) always wins.
+  let inf = uiInfo(node)
+  if inf != nil:
+    case prop
+    of "width":
+      if parseDimensionFast(value) > 0: inf.explicitWidth = true
+    of "height":
+      if parseDimensionFast(value) > 0: inf.explicitHeight = true
+    of "font-size", "font-weight":
+      # The new font may have changed the text's natural size; remeasure.
+      r.refreshTextIntrinsicSize(node)
+    else:
+      discard
 
 proc addEventListener*(r: UIKitRenderer; node: UIKitElement; event: string;
                         handler: proc()) =
