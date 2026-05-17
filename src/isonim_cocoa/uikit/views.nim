@@ -37,6 +37,20 @@ proc uiAddSubview*(parent, child: Id) =
 proc uiRemoveFromSuperview*(view: Id) =
   msgSendVoid(view, sel("removeFromSuperview"))
 
+proc uiSetNeedsLayout*(view: Id) =
+  ## Mark `view` as needing layout — UIKit will recompute frames on
+  ## the next layout pass. Pair with `uiLayoutIfNeeded` to force an
+  ## immediate synchronous layout, which is what the Nim composition
+  ## roots want after they push frames via `setFrame:` so that the
+  ## off-screen `drawHierarchy(in:)` capture in the Stream app sees
+  ## fully-laid-out subviews on the very first tick.
+  msgSendVoid(view, sel("setNeedsLayout"))
+
+proc uiLayoutIfNeeded*(view: Id) =
+  ## Force an immediate layout pass on `view` and its descendants.
+  ## Equivalent to `[view layoutIfNeeded]` in Objective-C.
+  msgSendVoid(view, sel("layoutIfNeeded"))
+
 proc uiSetHidden*(view: Id; hidden: bool) =
   uikitMsgSendVoidBool(view, sel("setHidden:"), hidden)
 
