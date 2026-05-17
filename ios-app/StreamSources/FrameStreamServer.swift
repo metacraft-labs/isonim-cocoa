@@ -29,7 +29,31 @@ final class FrameStreamServer {
     private let streamQueue = DispatchQueue(label: "isonim.stream.server",
                                             qos: .userInitiated)
 
+    // We run TWO parallel NWListeners on the same TCP port:
+    //
+    //   1. `listener` — the default-parameters listener that handles
+    //      Wi-Fi (and historically advertised Bonjour). It uses
+    //      `includePeerToPeer = true`, which on iOS opts the listener
+    //      into peer-to-peer transports (AWDL / Wi-Fi Direct / BT).
+    //      That flag does NOT widen the interface set; on the contrary,
+    //      empirically the bundle of P2P-only params it pulls in skips
+    //      USB-tethered ethernet adapters entirely. So a host on the
+    //      Mac side that routes to the iPhone's USB link-local IPv6
+    //      address (FE80::...%enXX) gets "Connection refused" because
+    //      nothing is listening on that interface.
+    //
+    //   2. `usbListener` — a second listener with parameters explicitly
+    //      pinned to `.wiredEthernet`. iOS exposes the USB-tethered
+    //      network adapter (the host-side `en10`/`en11` pair) as
+    //      wired ethernet from the device's perspective, so this
+    //      listener binds the USB interface and accepts TCP from
+    //      `nc -6 FE80::...%enXX 8200`.
+    //
+    // Both listeners share the same `accept(_:)` callback, the same
+    // serial `streamQueue`, and the same connection list, so the
+    // broadcast fan-out treats USB and Wi-Fi clients identically.
     private var listener: NWListener?
+    private var usbListener: NWListener?
     private var connections: [NWConnection] = []
     private var activeClientCount: Int32 = 0  // atomic via OSAtomic
 
@@ -43,12 +67,14 @@ final class FrameStreamServer {
         streamQueue.async { [weak self] in
             guard let self else { return }
             guard self.listener == nil else { return }
+            let nwPort = NWEndpoint.Port(rawValue: requestedPort) ?? .any
+
+            // ---- Listener #1: Wi-Fi + peer-to-peer + Bonjour ----
             do {
                 let params = NWParameters.tcp
                 params.allowLocalEndpointReuse = true
                 params.includePeerToPeer = true
-                let nwPort = NWEndpoint.Port(rawValue: requestedPort)
-                let listener = try NWListener(using: params, on: nwPort ?? .any)
+                let listener = try NWListener(using: params, on: nwPort)
                 listener.service = NWListener.Service(
                     name: "isonim-stream",
                     type: "_isonim-stream._tcp")
@@ -57,11 +83,11 @@ final class FrameStreamServer {
                     switch state {
                     case .ready:
                         if let p = listener.port?.rawValue {
-                            os_log("FrameStreamServer ready on port %{public}d",
+                            os_log("FrameStreamServer (wifi) ready on port %{public}d",
                                    log: self.log, type: .info, Int(p))
                         }
                     case .failed(let err):
-                        os_log("FrameStreamServer failed: %{public}@",
+                        os_log("FrameStreamServer (wifi) failed: %{public}@",
                                log: self.log, type: .error,
                                String(describing: err))
                     default:
@@ -74,7 +100,49 @@ final class FrameStreamServer {
                 listener.start(queue: self.streamQueue)
                 self.listener = listener
             } catch {
-                os_log("FrameStreamServer failed to start: %{public}@",
+                os_log("FrameStreamServer (wifi) failed to start: %{public}@",
+                       log: self.log, type: .error,
+                       String(describing: error))
+            }
+
+            // ---- Listener #2: USB-tethered wired ethernet ----
+            //
+            // Pinning `requiredInterfaceType = .wiredEthernet` is what
+            // gets us the USB interface. We deliberately do NOT set
+            // `includePeerToPeer` here (the two are orthogonal — P2P
+            // wants AWDL, USB wants the wired adapter) and we do NOT
+            // attach a Bonjour service (the Wi-Fi listener already
+            // advertises; broadcasting the same name twice would
+            // confuse mDNS resolution).
+            do {
+                let usbParams = NWParameters.tcp
+                usbParams.allowLocalEndpointReuse = true
+                usbParams.requiredInterfaceType = .wiredEthernet
+                let usb = try NWListener(using: usbParams, on: nwPort)
+                usb.stateUpdateHandler = { [weak self] state in
+                    guard let self else { return }
+                    switch state {
+                    case .ready:
+                        if let p = usb.port?.rawValue {
+                            os_log("FrameStreamServer (usb) ready on port %{public}d",
+                                   log: self.log, type: .info, Int(p))
+                        }
+                    case .failed(let err):
+                        os_log("FrameStreamServer (usb) failed: %{public}@",
+                               log: self.log, type: .error,
+                               String(describing: err))
+                    default:
+                        break
+                    }
+                }
+                usb.newConnectionHandler = { [weak self] conn in
+                    self?.accept(conn)
+                }
+                usb.start(queue: self.streamQueue)
+                self.usbListener = usb
+            } catch {
+                // Non-fatal: Wi-Fi path is still live.
+                os_log("FrameStreamServer (usb) failed to start: %{public}@",
                        log: self.log, type: .error,
                        String(describing: error))
             }
