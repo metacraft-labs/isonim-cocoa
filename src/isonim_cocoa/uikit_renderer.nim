@@ -438,6 +438,24 @@ proc resetUITree*() =
   uiElements.clear()
   uiResetCallbacks()
 
+proc childCount*(r: UIKitRenderer; node: UIKitElement): int =
+  ## Number of children currently parented under `node`. Required by
+  ## the settings_app shell's `createRenderEffect` for the inline
+  ## accordion bookkeeping (mirror of `CocoaRenderer.childCount`).
+  let inf = uiInfo(node)
+  if inf != nil: inf.children.len
+  else: 0
+
+proc nthChild*(r: UIKitRenderer; node: UIKitElement; index: int): UIKitElement =
+  ## Return the nth child of a node, or a nil sentinel when out of
+  ## bounds. Used by the settings shell + `choiceLeaf` to walk the
+  ## select-options sub-tree (mirror of `CocoaRenderer.nthChild`).
+  let inf = uiInfo(node)
+  if inf != nil and index >= 0 and index < inf.children.len:
+    inf.children[index]
+  else:
+    UIKitElement(Id(nil))
+
 proc fireEvent*(r: UIKitRenderer; node: UIKitElement; event: string) =
   ## Simulate an event dispatch (for testing).
   let inf = uiInfo(node)

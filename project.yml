@@ -74,11 +74,14 @@ targets:
         PRODUCT_MODULE_NAME: IsoNimCocoa_iOS
     dependencies: []
 
-  # Stream variant: Nim branded UI + TCP F-packet listener on port 8200
+  # Stream variant: Nim demo UI + TCP F-packet listener on port 8200
   # for the editor's pbIos launcher to dial into. Sibling of Branded —
-  # links against libisonim_app.a (same Nim entry point) but does NOT
-  # share Sources/ with the other variants (StreamAppDelegate has its
-  # own @main and would collide).
+  # links against the legacy `libisonim_app.a` (Branded scene fallback)
+  # PLUS the M-EVP-14 demo libraries `libtask_app_ios.a` and
+  # `libsettings_app_ios.a`. The Swift VC dispatches by the
+  # `ISONIM_DEMO` env var to whichever entry point the host injected
+  # (default `task`); a single bundle id keeps us under the 3-app
+  # Personal Team limit.
   IsoNim-Stream:
     type: application
     platform: iOS
@@ -91,7 +94,7 @@ targets:
         SWIFT_ACTIVE_COMPILATION_CONDITIONS: THEME_STREAM
         PRODUCT_NAME: "IsoNim Stream"
         PRODUCT_MODULE_NAME: IsoNimCocoa_iOS_Stream
-        OTHER_LDFLAGS: ["-lisonim_app", "-lobjc", "-lc++"]
+        OTHER_LDFLAGS: ["-lisonim_app", "-ltask_app_ios", "-lsettings_app_ios", "-lobjc", "-lc++"]
         LIBRARY_SEARCH_PATHS: ["$(PROJECT_DIR)/build"]
     dependencies: []
 

@@ -492,6 +492,8 @@
 				);
 				OTHER_LDFLAGS = (
 					"-lisonim_app",
+					"-ltask_app_ios",
+					"-lsettings_app_ios",
 					"-lobjc",
 					"-lc++",
 				);
@@ -613,6 +615,8 @@
 				);
 				OTHER_LDFLAGS = (
 					"-lisonim_app",
+					"-ltask_app_ios",
+					"-lsettings_app_ios",
 					"-lobjc",
 					"-lc++",
 				);

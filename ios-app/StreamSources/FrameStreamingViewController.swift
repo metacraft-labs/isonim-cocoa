@@ -1,5 +1,25 @@
 import UIKit
 
+// C-ABI entry points implemented in Nim. The Stream app links three
+// possible Nim libraries; only one of them is invoked per launch
+// according to the `ISONIM_DEMO` environment variable. Default falls
+// back to the legacy branded scene (`isonim_start`) so existing
+// deployments continue to work without the env var.
+//
+// - `isonim_task_start`     → libtask_app_ios.a (M-EVP-14 iOS port of
+//                             the seeded TaskAppVM demo).
+// - `isonim_settings_start` → libsettings_app_ios.a (the SettingsVM
+//                             demo with the brief's catalog).
+// - `isonim_start`          → libisonim_app.a (legacy branded scene).
+@_silgen_name("isonim_task_start")
+private func isonim_task_start(_ rootView: UnsafeMutableRawPointer,
+                               _ width: Double, _ height: Double,
+                               _ saTop: Double, _ saBottom: Double)
+@_silgen_name("isonim_settings_start")
+private func isonim_settings_start(_ rootView: UnsafeMutableRawPointer,
+                                   _ width: Double, _ height: Double,
+                                   _ saTop: Double, _ saBottom: Double)
+
 /// Hosts the Nim-rendered branded UI **and** drives the frame-readback
 /// loop. Pixels are pulled with `UIGraphicsImageRenderer` once per
 /// `CADisplayLink` tick (rate-limited to ~12-15 fps to stay under the
@@ -31,14 +51,38 @@ final class FrameStreamingViewController: UIViewController {
         super.viewDidLoad()
         view.backgroundColor = UIColor(red: 0xF8/255.0, green: 0xFA/255.0,
                                        blue: 0xFC/255.0, alpha: 1)
-        // Hand the view to Nim — same entry point as the Branded scheme.
+        // Hand the view to Nim. Which entry point we call depends on
+        // the `ISONIM_DEMO` env var the screenshot tool injects via
+        // `xcrun devicectl process launch --environment-variables`.
+        //
+        //   - `task`     → seeded TaskAppVM demo (M-EVP-14)
+        //   - `settings` → seeded SettingsVM demo
+        //   - (unset)    → legacy branded scene (preserves the manual
+        //                  Stream-app deployment path so a user who
+        //                  taps the icon still sees something useful).
+        //
+        // We stick to a single bundle id (Personal Team caps the dev
+        // account at 3 active provisioned apps) and route inside the
+        // VC instead of shipping three separate Stream variants.
         view.layoutIfNeeded()
         let bounds = view.bounds
         let insets = view.safeAreaInsets
         let ptr = Unmanaged.passUnretained(view).toOpaque()
-        isonim_start(ptr,
-                     Double(bounds.width), Double(bounds.height),
-                     Double(insets.top), Double(insets.bottom))
+        let demo = ProcessInfo.processInfo.environment["ISONIM_DEMO"] ?? "task"
+        switch demo {
+        case "settings":
+            isonim_settings_start(ptr,
+                                  Double(bounds.width), Double(bounds.height),
+                                  Double(insets.top), Double(insets.bottom))
+        case "task":
+            isonim_task_start(ptr,
+                              Double(bounds.width), Double(bounds.height),
+                              Double(insets.top), Double(insets.bottom))
+        default:
+            isonim_start(ptr,
+                         Double(bounds.width), Double(bounds.height),
+                         Double(insets.top), Double(insets.bottom))
+        }
 
         // Keep the screen awake while the Stream app is foregrounded. iOS
         // would otherwise dim → lock → background the app, which both
