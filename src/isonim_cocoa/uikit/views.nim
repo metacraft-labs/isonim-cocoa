@@ -313,6 +313,95 @@ proc uiButtonSetTitleColor*(btn: Id; r, g, b, a: cdouble) =
     `btn`, sel_registerName("setTitleColor:forState:"), color, 0); // UIControlStateNormal
   """.}
 
+proc uiButtonSetSFSymbol*(btn: Id; name: string;
+                          r, g, b, a: cdouble;
+                          pointSize: cdouble = 22.0) =
+  ## Replace the button's title image with an SF Symbol named `name`
+  ## (e.g. ``checkmark.circle.fill``), tinted with the given RGBA, and
+  ## also clear the title text so only the glyph paints. Used by the
+  ## task-app iOS leaves to swap the legacy Unicode ballot box / "x"
+  ## glyphs for native iOS check / minus icons.
+  let nsStr = toNSString(name)
+  {.emit: """
+  // Build a UIImage.SymbolConfiguration with the requested point size.
+  id cfgClass = (id)objc_getClass("UIImageSymbolConfiguration");
+  id cfg = ((id(*)(id, SEL, double))objc_msgSend)(
+    cfgClass, sel_registerName("configurationWithPointSize:"), `pointSize`);
+
+  // [UIImage systemImageNamed:`name` withConfiguration:cfg]
+  id img = ((id(*)(id, SEL, id, id))objc_msgSend)(
+    (id)objc_getClass("UIImage"),
+    sel_registerName("systemImageNamed:withConfiguration:"),
+    `nsStr`, cfg);
+
+  // Apply tint via [img imageWithTintColor:UIColor.colorWithRed:...]
+  // using the always-template rendering mode (2) so tintColor wins.
+  id color = ((id(*)(id, SEL, double, double, double, double))objc_msgSend)(
+    (id)objc_getClass("UIColor"),
+    sel_registerName("colorWithRed:green:blue:alpha:"),
+    `r`, `g`, `b`, `a`);
+  if (img) {
+    id tinted = ((id(*)(id, SEL, id, long))objc_msgSend)(
+      img, sel_registerName("imageWithTintColor:renderingMode:"), color, 2);
+    if (tinted) img = tinted;
+  }
+
+  // [btn setImage:img forState:UIControlStateNormal]
+  ((void(*)(id, SEL, id, unsigned long))objc_msgSend)(
+    `btn`, sel_registerName("setImage:forState:"), img, 0);
+
+  // Clear the title so only the symbol paints.
+  id empty = ((id(*)(id, SEL, const char*))objc_msgSend)(
+    (id)objc_getClass("NSString"),
+    sel_registerName("stringWithUTF8String:"), "");
+  ((void(*)(id, SEL, id, unsigned long))objc_msgSend)(
+    `btn`, sel_registerName("setTitle:forState:"), empty, 0);
+
+  // Also tint the button itself so template images respect the colour
+  // even on iOS versions that ignore the per-image tint mode.
+  ((void(*)(id, SEL, id))objc_msgSend)(
+    `btn`, sel_registerName("setTintColor:"), color);
+  """.}
+  release(nsStr)
+
+proc uiTextFieldSetPlaceholderColor*(tf: Id; r, g, b, a: cdouble) =
+  ## Set the placeholder text color via an attributed placeholder
+  ## string. Without this, UITextField paints the placeholder in the
+  ## default ``placeholderText`` colour which on a dark ``surfaceCard``
+  ## background reads as nearly invisible faint grey — the reviewer
+  ## flagged this on the iOS task cell.
+  ##
+  ## ``NSForegroundColorAttributeName`` is exposed as a global NSString
+  ## symbol by Foundation; we declare it ``extern`` inside the emit
+  ## block and use it as the attribute key.
+  {.emit: """
+  extern id NSForegroundColorAttributeName;
+
+  id placeholder = ((id(*)(id, SEL))objc_msgSend)(
+    `tf`, sel_registerName("placeholder"));
+  if (!placeholder) return;
+
+  id color = ((id(*)(id, SEL, double, double, double, double))objc_msgSend)(
+    (id)objc_getClass("UIColor"),
+    sel_registerName("colorWithRed:green:blue:alpha:"),
+    `r`, `g`, `b`, `a`);
+
+  id dictClass = (id)objc_getClass("NSDictionary");
+  id attrs = ((id(*)(id, SEL, id, id))objc_msgSend)(
+    dictClass, sel_registerName("dictionaryWithObject:forKey:"),
+    color, NSForegroundColorAttributeName);
+
+  id astrClass = (id)objc_getClass("NSAttributedString");
+  id astrAlloc = ((id(*)(id, SEL))objc_msgSend)(
+    astrClass, sel_registerName("alloc"));
+  id astr = ((id(*)(id, SEL, id, id))objc_msgSend)(
+    astrAlloc, sel_registerName("initWithString:attributes:"),
+    placeholder, attrs);
+
+  ((void(*)(id, SEL, id))objc_msgSend)(
+    `tf`, sel_registerName("setAttributedPlaceholder:"), astr);
+  """.}
+
 # ---------------------------------------------------------------------------
 # UISwitch
 # ---------------------------------------------------------------------------
