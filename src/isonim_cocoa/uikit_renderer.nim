@@ -208,7 +208,19 @@ proc applyUIStyle(elem: UIKitElement; prop, value: string) =
     else:
       uiSetHidden(view, false)
   of "background-color":
-    if resolved != "" and resolved != "transparent":
+    if inf != nil and inf.kind == uekSegmented:
+      # For UISegmentedControl, route background-color to the selected
+      # segment's tint colour (-setSelectedSegmentTintColor:). The
+      # control's own track colour is system-managed and styling it
+      # directly creates the opposite of what the iOS HIG expects;
+      # what readers actually want when they say "background colour of
+      # the segmented" is the lifted pill behind the active option,
+      # which under iOS dark mode needs an explicit darker fill so it
+      # stands out against the white track on the demo's light surface.
+      if resolved != "" and resolved != "transparent":
+        let (r, g, b, a) = parseHexColor(resolved)
+        uiSegmentedControlSetSelectedTintColor(view, r, g, b, a)
+    elif resolved != "" and resolved != "transparent":
       let (r, g, b, a) = parseHexColor(resolved)
       uiSetBackgroundColor(view, r, g, b, a)
     elif resolved == "transparent":

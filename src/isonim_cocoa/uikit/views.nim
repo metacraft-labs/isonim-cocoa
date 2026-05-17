@@ -480,3 +480,28 @@ proc uiSegmentedControlAddTarget*(sc: Id; target: Id; action: Sel) =
     `sc`, sel_registerName("addTarget:action:forControlEvents:"),
     `target`, `action`, (1UL << 12));
   """.}
+
+proc uiSegmentedControlSetSelectedTintColor*(sc: Id; r, g, b, a: cdouble) =
+  ## Set the fill colour of the currently-selected segment
+  ## (`-setSelectedSegmentTintColor:`, iOS 13+). Used to lift the
+  ## selected pill off the segmented control's own track so it reads
+  ## as the active option in both light and dark mode — without this
+  ## the selected segment renders as system white-on-white-track which
+  ## visually disappears against the demo's light surface.
+  ##
+  ## Selector is sent unguarded: the build pins iOS 17 as the
+  ## deployment target (see `build-nim-ios-*.sh`'s
+  ## `arm64-apple-ios17.0` clang target), well above the iOS 13
+  ## minimum for `-setSelectedSegmentTintColor:`. The `@available`
+  ## sugar isn't available in pure-C `.emit` blocks and
+  ## `__builtin_available` would force every translation unit
+  ## through Objective-C-aware compile flags — neither buys us
+  ## anything given the pinned deployment target.
+  {.emit: """
+  id color = ((id(*)(id, SEL, double, double, double, double))objc_msgSend)(
+    (id)objc_getClass("UIColor"),
+    sel_registerName("colorWithRed:green:blue:alpha:"),
+    `r`, `g`, `b`, `a`);
+  ((void(*)(id, SEL, id))objc_msgSend)(
+    `sc`, sel_registerName("setSelectedSegmentTintColor:"), color);
+  """.}
