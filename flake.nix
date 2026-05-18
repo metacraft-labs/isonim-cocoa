@@ -26,24 +26,17 @@
               pkgs.nimble
               pkgs.just
             ]
-            ++ pkgs.lib.optionals isDarwin (
-              with pkgs.darwin.apple_sdk.frameworks;
-              [
-                # Frameworks
-                AppKit
-                Foundation
-                CoreGraphics
-                CoreText
-                QuartzCore
-                WebKit
-                AVKit
-                MapKit
+            ++ pkgs.lib.optionals isDarwin [
+              # Apple frameworks (AppKit, Foundation, CoreGraphics, CoreText,
+              # QuartzCore, WebKit, AVKit, MapKit) are provided by the default
+              # Apple SDK now that darwin.apple_sdk_11_0 has been removed.
+              # See https://github.com/NixOS/nixpkgs (Darwin migration notes).
+              pkgs.apple-sdk_15
 
-                # iOS device deployment & Xcode project generation
-                pkgs.ios-deploy
-                pkgs.xcodegen
-              ]
-            );
+              # iOS device deployment & Xcode project generation
+              pkgs.ios-deploy
+              pkgs.xcodegen
+            ];
 
           shellHook = ''
             echo "isonim-cocoa dev shell — nim $(nim --version 2>&1 | head -1)"
