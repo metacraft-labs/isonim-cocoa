@@ -697,9 +697,32 @@ proc createTextNode*(r: CocoaRenderer; text: string): CocoaElement =
   discard ensureInfo(result, ekText, "#text")
 
 proc appendChild*(r: CocoaRenderer; parent, child: CocoaElement) =
-  addSubview(Id(parent), Id(child))
   let pi = info(parent)
   let ci = info(child)
+  # When parent is an ekSelect (NSPopUpButton) and child is an <option>,
+  # NSPopUpButton ignores subviews — its visible menu items live in
+  # the NSMenu reachable via -[NSPopUpButton menu]. Forward the option's
+  # text/data-value to ``addItemWithTitle:`` so the popup chrome shows
+  # an actual current selection rather than an empty arrow. We still
+  # record the option in the Nim-side ``children`` table so the
+  # renderer's tree traversal (childCount/nthChild/etc.) — used by the
+  # leaves' reactive effects and the headless manifest builder —
+  # continues to see the option nodes.
+  let isOption = ci != nil and ci.tag == "option"
+  if pi != nil and pi.kind == ekSelect and isOption:
+    var title = ci.attributes.getOrDefault("data-value", "")
+    if title.len == 0:
+      # Fall back to the option's text content when no data-value is
+      # set (matches the HTML semantics where the option's text is the
+      # display value).
+      title = stringValue(Id(child))
+    popUpAddItem(Id(parent), title)
+    if pi != nil:
+      pi.children.add(child)
+    if ci != nil:
+      ci.parent = parent
+    return
+  addSubview(Id(parent), Id(child))
   if pi != nil:
     pi.children.add(child)
   if ci != nil:
