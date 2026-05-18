@@ -234,20 +234,29 @@ suite "Renderer - selection controls":
   setup:
     resetTree()
 
-  test "createElement switch creates NSSwitch":
+  test "createElement switch creates a switch-tagged NSButton":
+    # M-EVP-14 Wave V: ``<switch>`` re-routes to ekButton (NSButton)
+    # so the layer-fill branch can paint the IsoNim brand indigo —
+    # NSSwitch's ``setOnTintColor:`` is a no-op on macOS Sonoma so
+    # the historical NSSwitch path can never reach the brand accent.
     let r = CocoaRenderer()
     let elem = r.createElement("switch")
     check not Id(elem).isNil
-    # Set checked via attribute
+    # ``checked`` is now tracked via the attribute table on the
+    # element (the layer fill flips between accent and muted-dark);
+    # round-trip through getAttribute is the supported observation
+    # point now that the underlying control is an NSButton.
     r.setAttribute(elem, "checked", "true")
-    check switchState(Id(elem)) == true
+    check r.getAttribute(elem, "checked") == "true"
+    r.setAttribute(elem, "checked", "false")
+    check r.getAttribute(elem, "checked") == "false"
 
   test "createElement toggle is alias for switch":
     let r = CocoaRenderer()
     let elem = r.createElement("toggle")
     check not Id(elem).isNil
     r.setAttribute(elem, "checked", "true")
-    check switchState(Id(elem)) == true
+    check r.getAttribute(elem, "checked") == "true"
 
   test "createElement slider creates NSSlider":
     let r = CocoaRenderer()

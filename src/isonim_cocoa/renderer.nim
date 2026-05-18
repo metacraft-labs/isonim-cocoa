@@ -133,7 +133,20 @@ const tagMap = {
   "search": ekSearch,
 
   # Selection controls
-  "switch": ekSwitch, "toggle": ekSwitch,
+  # M-EVP-14 Wave V: route ``<switch>`` / ``<toggle>`` to ekButton
+  # rather than ekSwitch. macOS Sonoma's NSSwitch silently ignores
+  # ``-[NSSwitch setOnTintColor:]`` (Wave T-8 confirmed the selector
+  # exists but doesn't actually retint the on-state pill), so we can
+  # never paint the IsoNim brand indigo on a real NSSwitch. The
+  # bezel-less NSButton branch (see ``background-color`` style
+  # handler below) honours leaf-driven ``background-color`` +
+  # ``color`` directly on the view's CALayer, which the cocoa
+  # capture adapter renders verbatim. The createElement path adds
+  # pill styling (radius 11, bezel-less, dark muted off-state) so a
+  # plain ``<switch>`` reads as a toggle pill out of the box; the
+  # ``checked`` attribute handler flips the layer fill between the
+  # accent colour and the muted off-tone.
+  "switch": ekButton, "toggle": ekButton,
   "slider": ekSlider, "range": ekSlider,
   "select": ekSelect,
   "segmented": ekSegmented,
@@ -316,6 +329,17 @@ proc resolveStyleValue*(prop, value: string): string =
   else:
     value
 
+# Forward declaration: applyStyle's switch-as-button branch may
+# re-fire the ``checked`` attribute handler when the leaf sets the
+# accent colour after the on-state has already been latched.
+proc applyAttribute(elem: CocoaElement; name, value: string)
+
+# M-EVP-14 Wave V: ``<switch>`` and ``<toggle>`` re-route to ekButton
+# but keep the switch semantics. Shared helper used by both the
+# style and attribute handlers.
+proc isSwitchTag(tag: string): bool {.inline.} =
+  tag == "switch" or tag == "toggle"
+
 proc applyStyle(elem: CocoaElement; prop, value: string) =
   let resolved = resolveStyleValue(prop, value)
   let view = Id(elem)
@@ -468,6 +492,19 @@ proc applyStyle(elem: CocoaElement; prop, value: string) =
           (id)`view`, setOnTintSel, nsColor);
       }
       """.}
+    elif inf != nil and inf.kind == ekButton and isSwitchTag(inf.tag):
+      # M-EVP-14 Wave V: ``<switch>`` re-routes to ekButton, but the
+      # settings_app / task_app leaves still call
+      # ``setStyle("color", "#7c7aed")`` to pin the IsoNim brand
+      # indigo as the on-state tint (the historical NSSwitch
+      # ``setOnTintColor:`` path). Stash the accent on the element
+      # so the ``checked`` handler can paint it as the layer fill
+      # when the toggle flips on, and apply it eagerly here if the
+      # element is already in the on-state.
+      inf.attributes["data-accent-color"] = resolved
+      let isOnNow = inf.attributes.getOrDefault("checked", "") == "true"
+      if isOnNow:
+        applyAttribute(elem, "checked", "true")
   of "font-size":
     if inf != nil and inf.kind in {ekText, ekLabel, ekInput, ekSearch, ekSecureInput}:
       let size = try: parseFloat(value.replace("px", "").strip()) except: 13.0
@@ -570,6 +607,74 @@ proc applyAttribute(elem: CocoaElement; name, value: string) =
   of "checked":
     if inf != nil and inf.kind == ekSwitch:
       setSwitchState(view, value == "true" or value == "checked")
+    elif inf != nil and inf.kind == ekButton and isSwitchTag(inf.tag):
+      # M-EVP-14 Wave V: paint the switch-as-button pill state. ON
+      # uses the leaf-supplied accent (stashed in
+      # ``data-accent-color`` by the ``color`` style handler, fallback
+      # IsoNim indigo ``#7c7aed``); OFF uses the muted dark
+      # ``#3a3a40``. We also drop a white ``●`` thumb glyph for the
+      # on-state so the pill reads as a switch at preview scale and
+      # carries a positive visual signal in screenshots.
+      let isOn = value == "true" or value == "checked"
+      let accentHex = inf.attributes.getOrDefault("data-accent-color",
+                                                   "#7c7aed")
+      let (ar, ag, ab, _) = parseHexColor(accentHex)
+      let onR = ar
+      let onG = ag
+      let onB = ab
+      let titleStr = if isOn: "●" else: ""
+      let titleC = titleStr.cstring
+      {.emit: """
+      // Paint the layer fill based on the on/off state. Off-state
+      // uses ~#1a1a22 — deliberately darker than every neutralTint
+      // level so the sunken-track pill is legible at any depth.
+      double rr = `isOn` ? `onR` : 0.102;
+      double gg = `isOn` ? `onG` : 0.102;
+      double bb = `isOn` ? `onB` : 0.133;
+      id fillColor = ((id(*)(id, SEL, double, double, double, double))objc_msgSend)(
+        (id)objc_getClass("NSColor"),
+        sel_registerName("colorWithRed:green:blue:alpha:"),
+        rr, gg, bb, 1.0);
+      id layer = ((id(*)(id, SEL))objc_msgSend)(`view`, sel_registerName("layer"));
+      if (layer) {
+        void* cgColor = ((void*(*)(id, SEL))objc_msgSend)(
+          fillColor, sel_registerName("CGColor"));
+        ((void(*)(id, SEL, void*))objc_msgSend)(
+          layer, sel_registerName("setBackgroundColor:"), cgColor);
+      }
+      // Set a white "●" thumb glyph on the on-state, empty on off.
+      id thumbStr = ((id(*)(id, SEL, const char*))objc_msgSend)(
+        (id)objc_getClass("NSString"),
+        sel_registerName("stringWithUTF8String:"), `titleC`);
+      id whiteColor = ((id(*)(id, SEL, double, double, double, double))objc_msgSend)(
+        (id)objc_getClass("NSColor"),
+        sel_registerName("colorWithRed:green:blue:alpha:"),
+        1.0, 1.0, 1.0, 1.0);
+      id attrKey = ((id(*)(id, SEL, const char*))objc_msgSend)(
+        (id)objc_getClass("NSString"),
+        sel_registerName("stringWithUTF8String:"), "NSColor");
+      id dict = ((id(*)(id, SEL, id, id))objc_msgSend)(
+        (id)objc_getClass("NSDictionary"),
+        sel_registerName("dictionaryWithObject:forKey:"),
+        whiteColor, attrKey);
+      id attrStr = ((id(*)(id, SEL, id, id))objc_msgSend)(
+        ((id(*)(id, SEL))objc_msgSend)(
+          (id)objc_getClass("NSAttributedString"),
+          sel_registerName("alloc")),
+        sel_registerName("initWithString:attributes:"),
+        thumbStr, dict);
+      if (((BOOL(*)(id, SEL, id))objc_msgSend)(
+            (id)`view`, sel_registerName("respondsToSelector:"),
+            sel_registerName("setAttributedTitle:"))) {
+        ((void(*)(id, SEL, id))objc_msgSend)(
+          (id)`view`, sel_registerName("setAttributedTitle:"), attrStr);
+      }
+      """.}
+      # The "explicit background" flag tells the cocoa capture
+      # adapter to skip its neutralTint default for this view (and
+      # propagate the skip to descendants). Switch-as-button always
+      # has a deliberate fill, so set the flag regardless of state.
+      inf.hasExplicitBackground = true
   of "min":
     if inf != nil and inf.kind == ekSlider:
       let v = try: parseFloat(value) except: 0.0
@@ -693,7 +798,12 @@ proc setAutoAccessibilityRole(view: Id; kind: ElementKind; tag: string) =
   ## Set a default accessibility role based on the element kind.
   case kind
   of ekButton:
-    setAccessibilityRole(view, accessibilityButtonRole())
+    # M-EVP-14 Wave V: ``<switch>`` / ``<toggle>`` route to ekButton
+    # but semantically remain checkboxes for accessibility tooling.
+    if tag == "switch" or tag == "toggle":
+      setAccessibilityRole(view, accessibilityCheckBoxRole())
+    else:
+      setAccessibilityRole(view, accessibilityButtonRole())
   of ekInput, ekSearch, ekSecureInput, ekTextArea:
     setAccessibilityRole(view, accessibilityTextFieldRole())
   of ekLabel, ekText:
@@ -714,11 +824,59 @@ proc setAutoAccessibilityRole(view: Id; kind: ElementKind; tag: string) =
   else:
     discard  # No default role for specialized views
 
+proc applySwitchPillDefaults(elem: CocoaElement) =
+  ## M-EVP-14 Wave V: paint the initial pill chrome for a
+  ## ``<switch>``-tagged NSButton. Drops the bordered bezel so the
+  ## CALayer fill becomes the visible surface, fills the layer with
+  ## a muted dark off-state tone (``#3a3a40``), and rounds the
+  ## corners to half the canonical 22 px switch height so the button
+  ## reads as a pill rather than a rectangle. The reactive
+  ## ``checked`` handler later flips the fill between the accent
+  ## colour (on) and this muted tone (off); leaves can also override
+  ## the off-state tone explicitly via ``setStyle("background-color",
+  ## ...)``.
+  let view = Id(elem)
+  setWantsLayer(view)
+  {.emit: """
+  // Bezel-less NSButton: layer fill is the visible surface.
+  ((void(*)(id, SEL, BOOL))objc_msgSend)(
+    (id)`view`, sel_registerName("setBordered:"), NO);
+  // Suppress the default button title; the pill itself is the
+  // affordance. The ``checked`` handler will set "●" later when
+  // the on-state is reached so the indigo pill has a visible thumb.
+  id emptyTitle = ((id(*)(id, SEL, const char*))objc_msgSend)(
+    (id)objc_getClass("NSString"),
+    sel_registerName("stringWithUTF8String:"), "");
+  ((void(*)(id, SEL, id))objc_msgSend)(
+    (id)`view`, sel_registerName("setTitle:"), emptyTitle);
+  // Initial muted-dark off-state fill on the CALayer. We pick a
+  // tone (~#1a1a22) deliberately darker than every level of the
+  // cocoa adapter's ``neutralTint`` palette (#18181C..#3A3A40) so
+  // the off-pill reads as a sunken-track against any row depth.
+  id offColor = ((id(*)(id, SEL, double, double, double, double))objc_msgSend)(
+    (id)objc_getClass("NSColor"),
+    sel_registerName("colorWithRed:green:blue:alpha:"),
+    0.102, 0.102, 0.133, 1.0);  /* ~#1a1a22 */
+  id layer = ((id(*)(id, SEL))objc_msgSend)(`view`, sel_registerName("layer"));
+  if (layer) {
+    void* cgColor = ((void*(*)(id, SEL))objc_msgSend)(
+      offColor, sel_registerName("CGColor"));
+    ((void(*)(id, SEL, void*))objc_msgSend)(
+      layer, sel_registerName("setBackgroundColor:"), cgColor);
+    // Half-height pill radius — assumes ~22 px canonical switch
+    // height (leaves pin via ``data-fixed-height`` 22-24).
+    ((void(*)(id, SEL, double))objc_msgSend)(
+      layer, sel_registerName("setCornerRadius:"), 11.0);
+  }
+  """.}
+
 proc createElement*(r: CocoaRenderer; tag: string): CocoaElement =
   let kind = tagMap.getOrDefault(tag, ekView)
   result = createNativeView(kind, tag)
   discard ensureInfo(result, kind, tag)
   setAutoAccessibilityRole(Id(result), kind, tag)
+  if isSwitchTag(tag) and kind == ekButton:
+    applySwitchPillDefaults(result)
 
 proc createTextNode*(r: CocoaRenderer; text: string): CocoaElement =
   result = CocoaElement(newNSLabel(text))
