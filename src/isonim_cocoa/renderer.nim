@@ -365,6 +365,71 @@ proc applyStyle(elem: CocoaElement; prop, value: string) =
     # its neutral-tint default and let the explicit colour win.
     if inf != nil:
       inf.hasExplicitBackground = true
+    # M-EVP-14 round-5: NSButton's default bordered bezel paints the
+    # system gray/white button chrome *on top* of the layer's
+    # ``backgroundColor`` — so the leaf's accent colour (e.g. the
+    # task_app Add Task button's ``#7c7aed`` indigo) ends up hidden
+    # behind the AppKit bezel and the headless capture shows a flat
+    # white button instead. NSTextField's default bezel is the same
+    # story (white field bezel hides the layer fill). When the leaf
+    # explicitly picks a brand colour we drop the bezel for those
+    # control kinds so the layer fill becomes the visible surface.
+    # We also paint the label / text foreground white for buttons
+    # since the typical accent palette is dark-indigo + white text.
+    if inf != nil and inf.kind in {ekButton, ekInput, ekSearch, ekSecureInput}:
+      {.emit: """
+      // NSButton: drop the bordered bezel so the layer's
+      // backgroundColor shows through. NSTextField: same.
+      ((void(*)(id, SEL, BOOL))objc_msgSend)(
+        (id)`view`, sel_registerName("setBordered:"), NO);
+      // NSTextField (and its subclasses): make sure the field
+      // doesn't paint a white background over our layer fill.
+      if (((BOOL(*)(id, SEL, id))objc_msgSend)(
+            (id)`view`, sel_registerName("respondsToSelector:"),
+            sel_registerName("setDrawsBackground:"))) {
+        ((void(*)(id, SEL, BOOL))objc_msgSend)(
+          (id)`view`, sel_registerName("setDrawsBackground:"), NO);
+      }
+      """.}
+      if inf.kind == ekButton:
+        {.emit: """
+        // Button titles default to system text colour (dark grey on
+        // light bezel). Once the bezel is gone the accent fill
+        // becomes the background and the title needs to read on it
+        // — white is the safe default for the dark-indigo palette
+        // the task_app uses.
+        id whiteTitle = ((id(*)(id, SEL, double, double, double, double))objc_msgSend)(
+          (id)objc_getClass("NSColor"),
+          sel_registerName("colorWithRed:green:blue:alpha:"),
+          1.0, 1.0, 1.0, 1.0);
+        // Build an NSAttributedString { foregroundColor: white } from
+        // the button's current title so the colour cascades into the
+        // bezel-less label.
+        id curTitle = ((id(*)(id, SEL))objc_msgSend)(
+          (id)`view`, sel_registerName("title"));
+        if (curTitle) {
+          id attrKey = ((id(*)(id, SEL, const char*))objc_msgSend)(
+            (id)objc_getClass("NSString"),
+            sel_registerName("stringWithUTF8String:"),
+            "NSColor");
+          id dict = ((id(*)(id, SEL, id, id))objc_msgSend)(
+            (id)objc_getClass("NSDictionary"),
+            sel_registerName("dictionaryWithObject:forKey:"),
+            whiteTitle, attrKey);
+          id attrStr = ((id(*)(id, SEL, id, id))objc_msgSend)(
+            ((id(*)(id, SEL))objc_msgSend)(
+              (id)objc_getClass("NSAttributedString"),
+              sel_registerName("alloc")),
+            sel_registerName("initWithString:attributes:"),
+            curTitle, dict);
+          if (((BOOL(*)(id, SEL, id))objc_msgSend)(
+                (id)`view`, sel_registerName("respondsToSelector:"),
+                sel_registerName("setAttributedTitle:"))) {
+            ((void(*)(id, SEL, id))objc_msgSend)(
+              (id)`view`, sel_registerName("setAttributedTitle:"), attrStr);
+          }
+        }
+        """.}
   of "color":
     if inf != nil and inf.kind in {ekText, ekLabel, ekInput, ekSearch, ekSecureInput}:
       let (r, g, b, a) = parseHexColor(resolved)
