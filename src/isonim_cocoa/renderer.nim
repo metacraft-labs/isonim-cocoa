@@ -218,6 +218,35 @@ proc createNativeView(kind: ElementKind; tag: string): CocoaElement =
     result = CocoaElement(newNSSlider(0.0, 100.0, 50.0))
   of ekSelect:
     result = CocoaElement(newNSPopUpButton(@[]))
+    # M-EVP-14 Wave-X (X-6 fix): force the dark Aqua appearance on
+    # the NSPopUpButton instance. Without this the system control
+    # paints with the user's effective appearance (typically light
+    # when no NSWindow is in play, e.g. the offscreen capture path),
+    # leaving the popup as a white pill with near-black text inside
+    # the dark task-app / settings-app palette. Wave-X-6 reviewer
+    # flagged this as "AppKit popups forced light-mode" inside the
+    # dark chrome. Setting ``-setAppearance:`` to NSAppearanceNameDarkAqua
+    # binds the pop-up to the dark trait collection so the rendered
+    # bezel + the menu both honour the dark palette.
+    let popUpView = Id(result)
+    {.emit: """
+    if (((BOOL(*)(id, SEL, id))objc_msgSend)(
+          (id)`popUpView`, sel_registerName("respondsToSelector:"),
+          sel_registerName("setAppearance:"))) {
+      id darkName = ((id(*)(id, SEL, const char*))objc_msgSend)(
+        (id)objc_getClass("NSString"),
+        sel_registerName("stringWithUTF8String:"),
+        "NSAppearanceNameDarkAqua");
+      id darkAppearance = ((id(*)(id, SEL, id))objc_msgSend)(
+        (id)objc_getClass("NSAppearance"),
+        sel_registerName("appearanceNamed:"), darkName);
+      if (darkAppearance) {
+        ((void(*)(id, SEL, id))objc_msgSend)(
+          (id)`popUpView`, sel_registerName("setAppearance:"),
+          darkAppearance);
+      }
+    }
+    """.}
   of ekSegmented:
     result = CocoaElement(newNSSegmentedControl(@[]))
   of ekDatePicker:
@@ -622,15 +651,22 @@ proc applyAttribute(elem: CocoaElement; name, value: string) =
       let onR = ar
       let onG = ag
       let onB = ab
-      let titleStr = if isOn: "●" else: ""
+      # M-EVP-14 Wave-X (X-1 fix): paint a hollow ``☐`` glyph in the
+      # OFF state so the per-row toggle reads as a recognisable
+      # checkbox affordance instead of an empty pill. The prior empty
+      # string left the OFF state visually identical to the row's
+      # surface at preview scale.
+      let titleStr = if isOn: "●" else: "☐"
       let titleC = titleStr.cstring
       {.emit: """
       // Paint the layer fill based on the on/off state. Off-state
-      // uses ~#1a1a22 — deliberately darker than every neutralTint
-      // level so the sunken-track pill is legible at any depth.
-      double rr = `isOn` ? `onR` : 0.102;
-      double gg = `isOn` ? `onG` : 0.102;
-      double bb = `isOn` ? `onB` : 0.133;
+      // uses ~#3a3a52 — bright enough to read as a discrete pill
+      // affordance against the row card surface ``#1d1d28`` (the
+      // prior ``#1a1a22`` was indistinguishable from the row at
+      // preview scale, so the per-row toggle was visually missing).
+      double rr = `isOn` ? `onR` : 0.227;
+      double gg = `isOn` ? `onG` : 0.227;
+      double bb = `isOn` ? `onB` : 0.322;
       id fillColor = ((id(*)(id, SEL, double, double, double, double))objc_msgSend)(
         (id)objc_getClass("NSColor"),
         sel_registerName("colorWithRed:green:blue:alpha:"),
