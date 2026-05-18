@@ -219,9 +219,31 @@ stream-device := "688D4B24-9EDF-51E3-B343-F351DE814897"
 stream-bundle := "com.metacraft.isonim.cocoa.stream"
 stream-port := "8200"
 
+# M-EVP-14 Wave W-4: build the SettingsVM iOS static lib. The
+# Stream app's FrameStreamingViewController dispatches into
+# `isonim_settings_start` whenever the screenshot tool sets
+# `ISONIM_DEMO=settings`; without this recipe the Stream-app
+# install path silently ships a stale settings binary and the
+# in-editor capture continues to display the previous build's
+# tree (round-15 reviewer flagged the missing description tier as
+# the symptom — Wave U-5's source-side restoration was correct,
+# but `libsettings_app_ios.a` was last rebuilt before the commit
+# landed). Wraps the existing `build-nim-ios-settings.sh` script
+# so `deploy-stream` always relinks against the freshly built lib.
+build-nim-ios-settings:
+    ./build-nim-ios-settings.sh device
+
+# M-EVP-14 Wave W-4 sibling: build the TaskAppVM iOS static lib.
+build-nim-ios-task:
+    ./build-nim-ios-task.sh device
+
 # Build the Stream variant for device (ARM64, signed). Mirrors
 # `deploy-branded`'s prelude: Nim → C → static lib → xcodebuild.
-build-stream: build-nim-ios xcode-generate
+#
+# Wave W-4 fix: build all three Nim libraries the Stream app's
+# view controller may dispatch into (legacy branded, task, settings)
+# before xcodebuild so the linker always sees up-to-date object code.
+build-stream: build-nim-ios build-nim-ios-task build-nim-ios-settings xcode-generate
     #!/usr/bin/env bash
     set -euo pipefail
     /usr/bin/env -i HOME="$HOME" USER="$USER" TMPDIR="${TMPDIR:-/tmp}" \
