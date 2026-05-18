@@ -440,6 +440,34 @@ proc applyStyle(elem: CocoaElement; prop, value: string) =
         `r`, `g`, `b`, `a`);
       ((void(*)(id, SEL, id))objc_msgSend)(`view`, sel_registerName("setTextColor:"), nsColor);
       """.}
+    elif inf != nil and inf.kind == ekSwitch:
+      # M-EVP-14 Wave T (T-8 fix): tint NSSwitch's on-state colour
+      # via ``-[NSSwitch setOnTintColor:]`` (the macOS analog of
+      # UISwitch's ``onTintColor`` we already wire for ekSwitch on
+      # iOS). Without this the switch paints in the system accent
+      # (typically system-blue / teal on Sonoma), which the round-12
+      # reviewer flagged as competing with the IsoNim brand indigo
+      # ``#7c7aed`` used elsewhere on the page.
+      #
+      # ``setOnTintColor:`` is an undocumented but stable AppKit
+      # selector on NSSwitch since macOS 10.15. We probe with
+      # ``respondsToSelector:`` so older releases (where the switch
+      # falls back to the system accent) degrade gracefully without
+      # raising an unknown-selector exception.
+      let (r, g, b, a) = parseHexColor(resolved)
+      {.emit: """
+      id nsColor = ((id(*)(id, SEL, double, double, double, double))objc_msgSend)(
+        (id)objc_getClass("NSColor"),
+        sel_registerName("colorWithRed:green:blue:alpha:"),
+        `r`, `g`, `b`, `a`);
+      SEL setOnTintSel = sel_registerName("setOnTintColor:");
+      if (((BOOL(*)(id, SEL, SEL))objc_msgSend)(
+            (id)`view`, sel_registerName("respondsToSelector:"),
+            setOnTintSel)) {
+        ((void(*)(id, SEL, id))objc_msgSend)(
+          (id)`view`, setOnTintSel, nsColor);
+      }
+      """.}
   of "font-size":
     if inf != nil and inf.kind in {ekText, ekLabel, ekInput, ekSearch, ekSecureInput}:
       let size = try: parseFloat(value.replace("px", "").strip()) except: 13.0
