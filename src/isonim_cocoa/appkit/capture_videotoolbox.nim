@@ -30,8 +30,18 @@ type
   VideoToolboxEncoder* = ref object
     ## Opaque handle around the ObjC-side ``CtVTEncoder`` struct.
     ## The void pointer is owned and freed by ``destroy``.
+    ##
+    ## EPP-M9 added ``profileIdc`` / ``levelIdc`` — populated at
+    ## construction by the dynamic profile/level selector the ObjC
+    ## helper now runs (``pickProfileLevelForDims``). These are the
+    ## H.264 ProfileIDC / LevelIDC bytes the encoder is actually
+    ## producing; the V-packet ``codec_id`` is built from them via
+    ## ``packet_video.profileLevelToCodecId`` so the wire-advertised
+    ## codec string can never drift from the bytes the encoder emits.
     width*, height*: int
     bitrate*: int
+    profileIdc*: int
+    levelIdc*: int
     handle: pointer
 
   VideoToolboxEncodedFrame* = object
@@ -65,6 +75,10 @@ when defined(macosx):
                                   outLen: ptr cint): cint
     {.importc, cdecl.}
 
+  proc vt_encoder_get_profile_level(handle: pointer;
+                                     outProfileIdc, outLevelIdc: ptr cint): cint
+    {.importc, cdecl.}
+
   proc vt_encoder_destroy(handle: pointer) {.importc, cdecl.}
 
   proc isVideoToolboxAvailable*(): bool =
@@ -88,8 +102,18 @@ when defined(macosx):
                               cint(bitrate), cint(gop))
     if h == nil:
       return nil
+    # EPP-M9: read back the dynamically-selected profile/level the
+    # ObjC helper picked for these dims. The pair drives the V-packet
+    # codec_id the launcher advertises to the browser's
+    # ``VideoDecoder.configure`` call, so we surface it on the Nim-
+    # side handle for the render-serve adapter to consume.
+    var pi: cint = 0
+    var li: cint = 0
+    discard vt_encoder_get_profile_level(h, addr pi, addr li)
     VideoToolboxEncoder(width: width, height: height,
-                        bitrate: bitrate, handle: h)
+                        bitrate: bitrate,
+                        profileIdc: int(pi), levelIdc: int(li),
+                        handle: h)
 
   proc destroy*(enc: VideoToolboxEncoder) =
     if enc == nil or enc.handle == nil: return

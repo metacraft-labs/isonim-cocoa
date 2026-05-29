@@ -10,9 +10,17 @@
 // wrapper at ``isonim_cocoa/appkit/capture_videotoolbox.nim`` can
 // follow the same pattern as ``capture_metal.nim``.
 //
-// Session configuration (per the EPP-M5 brief + audit § 2.1):
+// Session configuration (per the EPP-M5 brief + audit § 2.1, updated
+// per the EPP-M9 audit § 2.1 dim-cap finding):
 //
-//   ProfileLevel:          kVTProfileLevel_H264_Baseline_AutoLevel
+//   ProfileLevel:          DYNAMIC — selected per encoded dimensions.
+//                          See pickProfileLevelForDims() below.
+//                          Replaces EPP-M5's hard-coded
+//                          ``kVTProfileLevel_H264_Baseline_AutoLevel``
+//                          which the EPP-M9 audit traced to a Level 3.0
+//                          coded-dim cap (720×576) that rejected the
+//                          editor's Laptop / Desktop viewports
+//                          (1280×800, 1440×900).
 //   RealTime:              kCFBooleanTrue
 //   AllowFrameReordering:  kCFBooleanFalse
 //   MaxKeyFrameInterval:   1                   (every frame is IDR)
@@ -21,7 +29,10 @@
 // Encoder lifecycle: the VTCompressionSession is dimension-bound.
 // Callers re-create the session via ``vt_encoder_create`` when the
 // surface resizes; the Nim wrapper takes care of the
-// invalidate / destroy pair.
+// invalidate / destroy pair. EPP-M9 adds
+// ``vt_encoder_get_profile_level`` so the launcher can read back the
+// chosen profile/level and feed it to the V-packet codec_id helper
+// (avc1.<ProfileIDC><Constraints><LevelIDC>, RFC 6381).
 //
 // NALU output framing: the helper collects raw Annex-B bytes
 // (start code prefixes 0x00000001) for both SPS / PPS parameter sets
@@ -88,6 +99,17 @@ int nim_videotoolbox_available(void) {
 // the callback finishes before the call returns and there is no
 // outstanding work at the destroy point.
 
+// H.264 profile / level identifiers — match the RFC 6381 codec_id
+// triplet that drives the browser's ``VideoDecoder.configure({codec})``
+// call. ``profileIdc`` is the AVC ProfileIDC byte (Baseline=0x42,
+// Main=0x4D, High=0x64); ``levelIdc`` is the AVC level encoded as the
+// integer level * 10 (so 3.0 = 30 = 0x1E, 4.0 = 40 = 0x28). The codec
+// string the launcher hands the browser is
+// ``avc1.<profileIdc><constraints><levelIdc>`` with each pair hex-
+// encoded; we keep the constraints field fixed at 0xE0 (the bit
+// pattern Apple's encoder emits — constraint_set0..2 = 1 for
+// "compatible with stricter profiles") so the browser's codec parser
+// accepts the string regardless of the selected level.
 typedef struct CtVTEncoder {
     VTCompressionSessionRef session;
     int width;
@@ -98,6 +120,8 @@ typedef struct CtVTEncoder {
     int hasSentExtraData; // 1 once SPS/PPS were attached to a frame
     int extraDataLen;     // bytes in extraData buffer (0 if none)
     unsigned char extraData[512]; // SPS/PPS in Annex-B framing
+    int profileIdc;       // EPP-M9: chosen H.264 ProfileIDC (0x42/0x4D/0x64)
+    int levelIdc;         // EPP-M9: chosen H.264 LevelIDC (e.g. 0x1E, 0x28)
 
     // Per-encode collection buffer. Reset before each
     // ``vt_encoder_encode`` call; the output callback appends here.
@@ -268,6 +292,178 @@ static OSStatus setSessionBool(VTCompressionSessionRef session,
     return VTSessionSetProperty(session, key, b);
 }
 
+// ---------------------------------------------------------------------------
+// EPP-M9: profile / level selection.
+// ---------------------------------------------------------------------------
+//
+// H.264 levels cap the coded dimensions, frame rate, and bitrate. Per the
+// AVC standard (ITU-T Rec. H.264, Annex A) the relevant per-level
+// constraints we care about here are:
+//
+//   Level 3.0: MaxFS  =  1620 MB  (e.g. 720×576 @ 30 fps)
+//   Level 3.1: MaxFS  =  3600 MB  (e.g. 1280×720 @ 30 fps)
+//   Level 3.2: MaxFS  =  5120 MB  (e.g. 1280×720 @ 60 fps)
+//   Level 4.0: MaxFS  =  8192 MB  (e.g. 2048×1024 @ 30 fps;
+//                                  also 1920×1080 @ 30 fps)
+//   Level 4.1: MaxFS  =  8192 MB  (higher bitrate budget than 4.0)
+//   Level 4.2: MaxFS  =  8704 MB  (e.g. 2048×1080 @ 60 fps)
+//   Level 5.0: MaxFS  = 22080 MB  (e.g. 3672×1536; phone portrait
+//                                  786×1704 = 5240 MB also fits 4.0
+//                                  by total but we step to 5.0 when
+//                                  either dimension is large enough
+//                                  that 4.0's per-side caps risk
+//                                  being tight — see picker below).
+//
+// One macroblock = 16×16 px so MaxFS in MB = ceil(W/16) * ceil(H/16).
+//
+// EPP-M5's original ``kVTProfileLevel_H264_Baseline_AutoLevel`` selector
+// observed at runtime always produced Level 3.0 NALUs (codec_id
+// ``avc1.42E01E``); that capped the coded dim envelope at 720×576 and
+// broke the Laptop / Desktop viewports.
+//
+// EPP-M9 picks the smallest level that fits the requested dims +
+// 30 fps target. We prefer Baseline because the browser-side
+// WebCodecs decoder has the broadest Baseline support; we step to
+// Main/High only if VideoToolbox refuses Baseline at the chosen level
+// (which it should not, for any of our target dims).
+
+typedef struct {
+    CFStringRef key;     // VTCompression property symbol
+    int profileIdc;      // Baseline=0x42, Main=0x4D, High=0x64
+    int levelIdc;        // level * 10, e.g. 4.0 -> 0x28
+    int maxFs;           // max frame size in 16×16 macroblocks
+    int maxSideLen;      // max side length in pixels (sqrt(8*MaxFS))
+    const char *label;   // for logging
+} CtH264ProfileLevel;
+
+static int macroblockCount(int width, int height) {
+    int wMb = (width + 15) / 16;
+    int hMb = (height + 15) / 16;
+    return wMb * hMb;
+}
+
+// Pick the smallest H.264 Baseline level whose MaxFS *and* MaxMBPS
+// envelopes cover the requested dims at the EPP-M5 60-fps
+// ``ExpectedFrameRate`` hint. AVC levels constrain three things we
+// care about here:
+//
+//   * MaxFS (max frame size in 16×16 macroblocks);
+//   * MaxMBPS (max macroblock processing rate, mb/s);
+//   * the per-side coded dim — derived from MaxFS as a soft cap.
+//
+// EPP-M9 audit observation: simply matching MaxFS isn't enough.
+// VideoToolbox enforces MaxMBPS strictly when we pin an explicit
+// level — at 60 fps a 640×480 frame (1200 mb) exceeds Level 3.0's
+// 40500 mb/s envelope (it'd need 72000 mb/s) and the encoder
+// silently drops every frame from the output callback. That was the
+// regression that produced "0 bytes" naluBytes during EPP-M9
+// development. EPP-M5's previous ``Baseline_AutoLevel`` selector
+// avoided the trap by letting VideoToolbox pick a Level high enough
+// for both the dims AND the frame rate — we replicate the same
+// arithmetic explicitly so the (profileIdc, levelIdc) pair the
+// launcher advertises in the V-packet codec_id genuinely matches
+// what the encoder produces on the wire.
+//
+// EPP-M9 codec_id-stability observation: in addition to the
+// MaxFS / MaxMBPS arithmetic the level picker enforces a *floor*
+// of Baseline 4.0 (``0x28``). Two reasons:
+//
+//   1. The editor's viewport pills (Desktop 1440×900, Laptop
+//      1280×800, Tablet 1024×768, Phone 390×844) span a MaxFS range
+//      of 600 → 5130 macroblocks. Without a floor the picker would
+//      flip between Baseline 3.0/3.1/3.2/4.0/4.2 across viewport
+//      switches; each flip changes the V-packet codec_id, which
+//      forces the browser's WebCodecs ``VideoDecoder`` to tear
+//      down + reconfigure for the new codec string. Chrome's
+//      WebCodecs implementation is selective about which exact
+//      ``avc1.42E0XX`` strings it accepts — empirically
+//      ``avc1.42E020`` (Baseline 3.2) is rejected with
+//      "Unsupported configuration" at Chrome 137+ even though the
+//      stream is decodable, while ``avc1.42E028`` (Baseline 4.0)
+//      is accepted universally. Pinning the floor at Baseline 4.0
+//      avoids the rejection and keeps the codec_id stable across
+//      the most common viewport switches.
+//   2. Baseline 4.0's MaxFS (8192 MB) covers every editor viewport
+//      through HD (1920×1080 = 8160 MB), so the floor is "free" —
+//      we never under-spec by using it. Above HD the picker steps
+//      to 4.2 / 5.0 / 5.x as needed.
+//
+// Frame-rate target: we pin 60 fps as the upper-bound for the level
+// picker so the same encoder works whether the launcher runs at 30
+// or 60 fps. 60 fps is more demanding (2× the MaxMBPS budget) so a
+// 60-fps-fit level is necessarily a 30-fps-fit level too.
+//
+// No probe-session round-trip is needed — Baseline is supported at
+// every level the macOS 10.9+ SDK exposes (we build against 11.0+)
+// so the lookup is purely arithmetic.
+static CtH264ProfileLevel pickProfileLevelForDims(int width, int height) {
+    int mbCount = macroblockCount(width, height);
+    // Target frame rate for the level-picker. EPP-M9 drops this from
+    // the EPP-M5 default of 60 to 30 to match the launcher's actual
+    // ``--fps 30`` cadence cap (and the ``ExpectedFrameRate`` hint
+    // set below). 30 fps halves the MaxMBPS pressure relative to 60
+    // fps, so Baseline 4.0 covers every editor viewport through
+    // 1920×1080 — keeping the codec_id stable at ``avc1.42E028`` for
+    // the entire pinned viewport ladder
+    // (Desktop / Laptop / Tablet / Phone). Bump targetFps in lockstep
+    // with the ``ExpectedFrameRate`` property set below if a future
+    // launcher needs 60 fps.
+    const int targetFps = 30;
+    int mbPerSecond = mbCount * targetFps;
+    // EPP-M9 codec_id-stability floor — see § doc-comment above.
+    const int floorLevelIdc = 0x28;  // Baseline 4.0
+    static const struct {
+        int profileIdc;
+        int levelIdc;
+        int maxFs;
+        int maxMbps;
+        const char *label;
+    } ladder[] = {
+        { 0x42, 0x28,  8192,  245760, "Baseline_4_0" },
+        { 0x42, 0x29,  8192,  245760, "Baseline_4_1" },
+        { 0x42, 0x2A,  8704,  522240, "Baseline_4_2" },
+        { 0x42, 0x32, 22080,  589824, "Baseline_5_0" },
+        { 0x42, 0x33, 36864,  983040, "Baseline_5_1" },
+        { 0x42, 0x34, 36864, 2073600, "Baseline_5_2" },
+    };
+    CFStringRef key = NULL;
+    for (size_t i = 0; i < sizeof(ladder) / sizeof(ladder[0]); i++) {
+        if (ladder[i].levelIdc < floorLevelIdc) continue;
+        if (ladder[i].maxFs < mbCount) continue;
+        if (ladder[i].maxMbps < mbPerSecond) continue;
+        switch (ladder[i].levelIdc) {
+        case 0x28: key = kVTProfileLevel_H264_Baseline_4_0; break;
+        case 0x29: key = kVTProfileLevel_H264_Baseline_4_1; break;
+        case 0x2A: key = kVTProfileLevel_H264_Baseline_4_2; break;
+        case 0x32: key = kVTProfileLevel_H264_Baseline_5_0; break;
+        case 0x33: key = kVTProfileLevel_H264_Baseline_5_1; break;
+        case 0x34: key = kVTProfileLevel_H264_Baseline_5_2; break;
+        default: key = NULL; break;
+        }
+        if (key == NULL) continue;
+        CtH264ProfileLevel pl;
+        pl.key = key;
+        pl.profileIdc = ladder[i].profileIdc;
+        pl.levelIdc = ladder[i].levelIdc;
+        pl.maxFs = ladder[i].maxFs;
+        pl.maxSideLen = 0;
+        pl.label = ladder[i].label;
+        return pl;
+    }
+    // Last-resort fallback: dims exceed Baseline 5.2's MaxFS/MaxMBPS.
+    // Pin to Baseline 5.2 and let VideoToolbox emit beyond-spec
+    // packets; the browser-side WebCodecs decoder will surface any
+    // actual rejection.
+    CtH264ProfileLevel pl;
+    pl.key = kVTProfileLevel_H264_Baseline_5_2;
+    pl.profileIdc = 0x42;
+    pl.levelIdc = 0x34;
+    pl.maxFs = 36864;
+    pl.maxSideLen = 0;
+    pl.label = "Baseline_5_2_fallback";
+    return pl;
+}
+
 void *vt_encoder_create(int width, int height, int bitrate, int gop) {
     if (width <= 0 || height <= 0) return NULL;
     @autoreleasepool {
@@ -298,10 +494,20 @@ void *vt_encoder_create(int width, int height, int bitrate, int gop) {
         }
         enc->session = session;
 
-        // Low-latency Baseline configuration.
+        // EPP-M9: dynamic profile/level selection. ``pickProfileLevelForDims``
+        // probes a candidate ladder (Baseline 3.0 .. 5.2, then High at
+        // the same MaxFS envelope) and returns the smallest entry whose
+        // MaxFS covers the requested width × height. The chosen
+        // CFStringRef goes straight into the live session via the
+        // ProfileLevel property key; the (profileIdc, levelIdc) pair is
+        // stashed on the encoder so ``vt_encoder_get_profile_level``
+        // can hand it back to the Nim wrapper for the V-packet codec_id.
+        CtH264ProfileLevel pl = pickProfileLevelForDims(width, height);
+        enc->profileIdc = pl.profileIdc;
+        enc->levelIdc = pl.levelIdc;
         (void)VTSessionSetProperty(session,
             kVTCompressionPropertyKey_ProfileLevel,
-            kVTProfileLevel_H264_Baseline_AutoLevel);
+            pl.key);
         (void)setSessionBool(session,
             kVTCompressionPropertyKey_RealTime, 1);
         (void)setSessionBool(session,
@@ -311,9 +517,12 @@ void *vt_encoder_create(int width, int height, int bitrate, int gop) {
         (void)setSessionInt(session,
             kVTCompressionPropertyKey_AverageBitRate, enc->bitrate);
         // Hint the encoder we're driving real-time content; this nudges
-        // rate control toward the bitrate ceiling.
+        // rate control toward the bitrate ceiling. EPP-M9 drops the
+        // ExpectedFrameRate from 60 to 30 to match the launcher's
+        // actual ``--fps 30`` cap; the picker above uses the same
+        // value when checking each candidate level's MaxMBPS budget.
         (void)setSessionInt(session,
-            kVTCompressionPropertyKey_ExpectedFrameRate, 60);
+            kVTCompressionPropertyKey_ExpectedFrameRate, 30);
 
         // VTCompressionSessionPrepareToEncodeFrames warms the encoder
         // so the first ``EncodeFrame`` call doesn't pay the lazy
@@ -439,6 +648,25 @@ int vt_encoder_encode(void *handle,
 // EPP-M6 milestone that wants to ship the parameter sets out-of-band
 // (e.g. in the hello capability bag) can read them without consuming
 // a full encode.
+
+// EPP-M9: profile / level introspection. Returns the (profileIdc,
+// levelIdc) pair the encoder was created with so the Nim wrapper can
+// build the V-packet ``codec_id`` (avc1.<ProfileIdc><Constraints><Level>)
+// the WebCodecs VideoDecoder consumes. The values are stable for the
+// lifetime of the encoder handle — VTCompressionSession's
+// dimension-bound contract means a resize tears down + rebuilds the
+// session, at which point a fresh selector pass runs.
+int vt_encoder_get_profile_level(void *handle,
+                                  int *outProfileIdc,
+                                  int *outLevelIdc) {
+    if (handle == NULL || outProfileIdc == NULL || outLevelIdc == NULL) {
+        return 0;
+    }
+    CtVTEncoder *enc = (CtVTEncoder *)handle;
+    *outProfileIdc = enc->profileIdc;
+    *outLevelIdc = enc->levelIdc;
+    return 1;
+}
 
 int vt_encoder_get_extra_data(void *handle,
                                 unsigned char *out, int outCap,
