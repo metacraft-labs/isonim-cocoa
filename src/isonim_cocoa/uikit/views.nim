@@ -530,3 +530,25 @@ proc uiSegmentedControlSetSelectedTintColor*(sc: Id; r, g, b, a: cdouble) =
   ((void(*)(id, SEL, id))objc_msgSend)(
     `sc`, sel_registerName("setSelectedSegmentTintColor:"), color);
   """.}
+
+proc uiSegmentedControlSetTitleColor*(sc: Id; state: culong;
+                                      r, g, b, a: cdouble) =
+  ## Set segment title foreground colour for one UIControlState.
+  ## Task App uses this to keep inactive labels legible on a dark
+  ## segmented track while selected text flips dark on the indigo pill.
+  {.emit: """
+  id color = ((id(*)(id, SEL, double, double, double, double))objc_msgSend)(
+    (id)objc_getClass("UIColor"),
+    sel_registerName("colorWithRed:green:blue:alpha:"),
+    `r`, `g`, `b`, `a`);
+  id dict = ((id(*)(id, SEL))objc_msgSend)(
+    (id)objc_getClass("NSMutableDictionary"), sel_registerName("dictionary"));
+  id fgKey = ((id(*)(id, SEL, const char *))objc_msgSend)(
+    (id)objc_getClass("NSString"), sel_registerName("stringWithUTF8String:"),
+    "NSForegroundColor");
+  ((void(*)(id, SEL, id, id))objc_msgSend)(
+    dict, sel_registerName("setObject:forKey:"), color, fgKey);
+  ((void(*)(id, SEL, id, unsigned long))objc_msgSend)(
+    `sc`, sel_registerName("setTitleTextAttributes:forState:"),
+    dict, (unsigned long)`state`);
+  """.}

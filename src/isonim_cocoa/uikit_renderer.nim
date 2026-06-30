@@ -232,6 +232,13 @@ proc applyUIStyle(elem: UIKitElement; prop, value: string) =
     elif inf != nil and inf.kind == uekButton:
       let (r, g, b, a) = parseHexColor(resolved)
       uiButtonSetTitleColor(view, r, g, b, a)
+    elif inf != nil and inf.kind == uekSegmented:
+      let (r, g, b, a) = parseHexColor(resolved)
+      uiSegmentedControlSetTitleColor(view, 0.culong, r, g, b, a)
+  of "selected-color":
+    if inf != nil and inf.kind == uekSegmented:
+      let (r, g, b, a) = parseHexColor(resolved)
+      uiSegmentedControlSetTitleColor(view, 4.culong, r, g, b, a)
   of "font-size":
     if inf != nil and inf.kind in {uekLabel, uekText, uekInput}:
       let size = try: parseFloat(value.replace("px", "").strip()) except: 17.0
