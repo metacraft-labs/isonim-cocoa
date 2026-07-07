@@ -1,0 +1,9 @@
+schema = "reprobuild.solved-graph-lock.v2"
+
+[lock]
+platform = "amd64-linux"
+optimal = false
+inputs_digest = "fnv1a64:b363d0856e700044"
+variants = []
+packages = [{ name = "gcc", version = "12.0.0", source = "gcc" }, { name = "isonim_cocoa", version = "0.1.0", source = "isonim_cocoa" }, { name = "nim", version = "2.0.0", source = "nim" }]
+deps = [{ name = "isonim-cocoa", path = ".", coord_kind = "vcs", url = "https://github.com/metacraft-labs/isonim-cocoa", ref = "mcr-stege0-and-fixes", revision = "40c4769ecc980d7255daf14b6ecd18a8931ce018", integrity = "git-sha1:40c4769ecc980d7255daf14b6ecd18a8931ce018", version = "", visibility = "public", participation = "", depends = "", groups = "" }]
