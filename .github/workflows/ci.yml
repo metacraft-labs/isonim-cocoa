@@ -9,7 +9,8 @@ on:
 jobs:
   nim-tests:
     name: Nim tests (macOS)
-    runs-on: macos-latest
+    # macOS-only by nature (AppKit/Cocoa bindings); single macOS Nix class.
+    runs-on: macos-tart
     steps:
       - uses: actions/checkout@v4
 
