@@ -38,6 +38,7 @@ test-renderer:
 
 # Run test infrastructure tests (FakeClock, snapshots)
 test-infra:
+    nim c -r --hints:off tests/test_nimcache_is_worktree_local.nim
     nim c -r --nimcache:nimcache/test_fake_clock tests/test_fake_clock.nim
     nim c -r --nimcache:nimcache/test_snapshots tests/test_snapshots.nim
 
