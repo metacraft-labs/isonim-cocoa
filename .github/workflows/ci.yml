@@ -12,16 +12,38 @@ jobs:
     # macOS-only by nature (AppKit/Cocoa bindings); single macOS Nix class.
     runs-on: [self-hosted, macos, arm64]
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/checkout@v4
+      # The suites compile against two sibling repositories that are not part
+      # of this checkout: `nim.cfg` puts `../isonim/src` and
+      # `../nim-everywhere/src` on the module path. isonim used to come from a
+      # second `actions/checkout` with `path: ../isonim`, which
+      # `actions/checkout` refuses ("Repository path '.../isonim-cocoa/isonim'
+      # is not under '.../isonim-cocoa/isonim-cocoa'"), so this job died on its
+      # second step on every run, and nim-everywhere was never cloned at all.
+      #
+      # `setup-dev-env` clones each entry of `.github/sibling-repos` to
+      # `../<name>` at the revision recorded there, and provisions Nix with the
+      # shared setup-nix action (Nix is already on the self-hosted runners;
+      # binary-cache traffic goes through the org Attic substituter), which
+      # replaces the DeterminateSystems installer and magic-nix-cache actions.
+      # Its token is minted from the CI Token Provider app, the same way
+      # `ci-reprobuild.yml` mints it.
+      - name: Mint installation token for cross-repo sibling clones
+        id: ci_token
+        uses: actions/create-github-app-token@v2
         with:
-          repository: metacraft-labs/isonim
-          path: ../isonim
-          token: ${{ secrets.GITHUB_TOKEN }}
+          app-id: ${{ secrets.CI_TOKEN_PROVIDER_APP_ID }}
+          private-key: ${{ secrets.CI_TOKEN_PROVIDER_PRIVATE_KEY }}
+          owner: metacraft-labs
 
-      - uses: DeterminateSystems/nix-installer-action@main
-      - uses: DeterminateSystems/magic-nix-cache-action@main
+      - uses: actions/checkout@v4
+
+      - name: Setup dev env (clones .github/sibling-repos)
+        uses: metacraft-labs/metacraft-github-actions/setup-dev-env@dev
+        with:
+          env-flavor: nix
+          gh-token: ${{ steps.ci_token.outputs.token }}
+          substituters: ${{ vars.ATTIC_SUBSTITUTER }}
+          trusted-public-keys: ${{ vars.ATTIC_TRUSTED_PUBLIC_KEY }}
 
       - name: nim check (renderer — AppKit surface)
         run: nix develop -c bash -c "nim check src/isonim_cocoa/renderer.nim"
