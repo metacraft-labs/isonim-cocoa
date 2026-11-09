@@ -21,6 +21,34 @@ verify-env:
     echo "Devices:    $(xcrun xctrace list devices 2>/dev/null | grep -c 'iPhone (' || echo '0') connected"
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Build
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Build what `repro build` builds: the six host-runnable test binaries that
+# `repro.nim` declares, into `build/test-bin/<stem>`, with the same flags
+# (`-d:release --mm:orc --threads:on`). The library itself is consumed as
+# source, so these binaries are the only artefacts the build graph produces.
+# `.github/workflows/ci-reprobuild.yml` runs `just build` to cross-check
+# `repro build`; without this recipe that step failed on every leg with
+# "Justfile does not contain recipe `build`". Keep the list in step with
+# `hostRunnableTestSpecs` in `repro.nim`.
+build:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    mkdir -p build/test-bin
+    for stem in \
+        test_metal_capture_frame_budget \
+        test_metal_capture_round_trip \
+        test_videotoolbox_bitrate \
+        test_videotoolbox_dim_envelope \
+        test_videotoolbox_resize_lifecycle \
+        test_videotoolbox_round_trip; do
+      nim c -d:release --mm:orc --threads:on --hints:off \
+        --nimcache:"nimcache/build/$stem" \
+        --out:"build/test-bin/$stem" "tests/$stem.nim"
+    done
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Nim tests (headless, no Xcode needed)
 # ─────────────────────────────────────────────────────────────────────────────
 
