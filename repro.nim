@@ -192,6 +192,12 @@ package isonim_cocoa:
       "clang"
     else:
       "gcc >=12"
+    # ``just`` is declared because the ``Justfile`` recipes (``just build``,
+    # ``just test``) run inside this package's environment: CI runs them
+    # through ``dev-exec`` after ``repro build`` / ``repro test``. On Windows
+    # there is no flake dev shell to supply it, and an undeclared ``just``
+    # was not found there ("The term 'just' is not recognized").
+    "just >=1"
 
   # Library declaration — the importable ``src/`` surface when this package
   # is consumed via ``uses: "isonim_cocoa"`` (e.g. the deferred cocoa-adapter
