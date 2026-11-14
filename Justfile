@@ -32,9 +32,13 @@ verify-env:
 # `repro build`; without this recipe that step failed on every leg with
 # "Justfile does not contain recipe `build`". Keep the list in step with
 # `hostRunnableTestSpecs` in `repro.nim`.
+#
+# No shebang: CI runs this recipe on Windows too, where `just` cannot run a
+# `#!/usr/bin/env bash` recipe without `cygpath`. Each line runs through the
+# `set shell` above (`bash -euo pipefail -c`), so the loop is one
+# backslash-continued command and `-e` stops it at the first failing compile,
+# failing the recipe.
 build:
-    #!/usr/bin/env bash
-    set -euo pipefail
     mkdir -p build/test-bin
     for stem in \
         test_metal_capture_frame_budget \
@@ -42,10 +46,10 @@ build:
         test_videotoolbox_bitrate \
         test_videotoolbox_dim_envelope \
         test_videotoolbox_resize_lifecycle \
-        test_videotoolbox_round_trip; do
+        test_videotoolbox_round_trip; do \
       nim c -d:release --mm:orc --threads:on --hints:off \
         --nimcache:"nimcache/build/$stem" \
-        --out:"build/test-bin/$stem" "tests/$stem.nim"
+        --out:"build/test-bin/$stem" "tests/$stem.nim"; \
     done
 
 # ─────────────────────────────────────────────────────────────────────────────
