@@ -9,3 +9,5 @@ build/
 .DS_Store
 xcuserdata/
 *.xcuserstate
+# reprobuild's per-checkout state (`repro build`, `repro test`, `repro exec`).
+.repro/

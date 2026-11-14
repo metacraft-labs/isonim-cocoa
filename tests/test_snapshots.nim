@@ -31,6 +31,22 @@ suite "Snapshot - PNG Capture":
     check png[3] == 0x47'u8  # 'G'
     release(view)
 
+  test "capture returns one whole PNG at 2 pixels per point":
+    # A truncated or padded buffer would not end in the IEND chunk, and a
+    # second capture of the same view must be identical byte for byte.
+    let label = newNSLabel("Whole capture")
+    let png = captureViewToPng(Id(label), 120, 30)
+    let again = captureViewToPng(Id(label), 120, 30)
+    check png.len > 33
+    check png[0 ..< 8] == @[0x89'u8, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]
+    # IHDR width and height (big-endian, bytes 16..23): 240 x 60 pixels.
+    check png[16 ..< 24] == @[0'u8, 0, 0, 240, 0, 0, 0, 60]
+    # Last chunk: zero length, "IEND", CRC 0xAE426082.
+    check png[^12 .. ^1] == @[0'u8, 0, 0, 0, 0x49, 0x45, 0x4E, 0x44,
+                               0xAE, 0x42, 0x60, 0x82]
+    check again == png
+    release(Id(label))
+
   test "capture NSTextField with text":
     let label = newNSLabel("Hello Snapshot")
     let png = captureViewToPng(Id(label), 200, 30)

@@ -1,2 +1,12 @@
-# Cross-repo siblings cloned by setup-dev-env at workspace-lock-pinned
-# revisions (see codetracer-specs/Testing/Cross-Repo-CI-Integration.md).
+# Cross-repo siblings cloned by setup-dev-env to ../<name>.
+#
+# The macOS suites compile against both: `nim.cfg` puts `../isonim/src` and
+# `../nim-everywhere/src` on the module path (isonim's `isonim/core/platform`
+# imports `nim_everywhere/platform`).
+#
+# The revisions are explicit because `repro.lock` cannot answer for these two:
+# `repro.nim` declares no `uses: "isonim"` edge (the Linux build graph reaches
+# no sibling), so the committed lock pins this repo only, and a bare name
+# would be refused as unpinned. Move a pin by editing the SHA here.
+isonim=37123d29caca7f6880fd8380a9cf3f44e883587c  # isonim@dev tip (2026-10-31)
+nim-everywhere=23cf930e5b2463d964579b318e01e4ef1cab63b3  # nim-everywhere@dev tip (2026-11-06)

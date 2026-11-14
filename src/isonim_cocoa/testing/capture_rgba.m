@@ -1,8 +1,10 @@
 // capture_rgba.m — ObjC helper for RS-M5: render an NSView headlessly to
 // a canonical RGBA8888 row-major byte buffer.
 //
-// This is the bytes-only sibling of snapshot_helper.m's
-// nim_capture_view_png. The bridge (isonim-render-serve) needs the raw
+// This is the bytes-only counterpart of snapshot_helper.m's
+// nim_capture_view_png (which, unlike this file, pins its own scale,
+// colour space, font smoothing and appearance for byte-exact golden
+// files). The bridge (isonim-render-serve) needs the raw
 // pixel buffer in canonical RGBA8888 byte order so it can build an
 // `F` packet directly without a PNG decode step on the wire.
 //
@@ -16,8 +18,7 @@
 //      AutoLayout passes commit before the bitmap is drawn.
 //   3. Ask the view for an NSBitmapImageRep via
 //      `bitmapImageRepForCachingDisplayInRect:`, falling back to a
-//      manually-allocated rep if AppKit returns nil (matches the
-//      snapshot_helper.m guard).
+//      manually-allocated rep if AppKit returns nil.
 //   4. Drive the rep through `cacheDisplayInRect:toBitmapImageRep:` —
 //      AppKit walks the view hierarchy and renders into the rep's
 //      backing store.

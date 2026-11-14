@@ -4,15 +4,15 @@ name: CI (reprobuild)
 # deterministic dev env through reprobuild instead of `nix develop` or
 # `env.ps1`. Runs alongside the existing `ci.yml` (`nix`) and any
 # `windows-build.yml` (`windows-diy`) entries so regressions in either
-# of the older paths still gate merges — see
-# `codetracer-specs/Repo-Requirements.md` §2.9 and
-# `metacraft-dev-guidelines/policies/ci-shared-dev-env.md` §4 for the
-# rollout shape.
+# of the older paths still gate merges. The rollout keeps all three
+# paths running at once on purpose: the reprobuild path becomes the
+# only gate once it has been green across every leg, and until then
+# the older workflows stay authoritative.
 #
 # The `setup-dev-env` composite action accepts `env-flavor: reprobuild`
-# (target state per the policy). When the action's reprobuild branch
-# lands, this workflow exercises it end-to-end on every supported
-# host without any other repo-side change.
+# (the target state). When the action's reprobuild branch lands, this
+# workflow exercises it end-to-end on every supported host without any
+# other repo-side change.
 
 on:
   push:
@@ -65,8 +65,8 @@ jobs:
 
       - name: Setup dev env (reprobuild flavor)
         # setup-dev-env clones the siblings listed in .github/sibling-repos
-        # (codetracer-trace-format, codetracer-trace-format-nim) at the
-        # workspace-lock-pinned revisions before materialising the env.
+        # (isonim, nim-everywhere) at the revisions recorded there, before
+        # materialising the env.
         uses: metacraft-labs/metacraft-github-actions/setup-dev-env@dev
         with:
           env-flavor: reprobuild
@@ -90,6 +90,12 @@ jobs:
         run: dev-exec just build
 
       - name: just test (cross-check)
+        # `just test` runs the AppKit suites (test-objc, test-views,
+        # test-renderer, test-infra). They link the Objective-C runtime and
+        # AppKit, so they compile only on macOS: on Linux and Windows the C
+        # back-end stops at `objc/runtime.h: No such file or directory`.
+        # They run on the macOS leg only. Every other step runs on every leg.
+        if: matrix.os == 'macos'
         run: dev-exec just test
 
       # Diagnostics on failure. Three things below are load-bearing:
