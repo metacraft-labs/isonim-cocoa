@@ -173,8 +173,13 @@ package isonim_cocoa:
     # Toolchain floor — the PATH-resolvable binaries the build needs.
     # ``nim`` compiles every host-runnable test binary (the
     # ``buildNimUnittest.build`` edges below, matching the nimble file's
-    # ``requires "nim >= 2.0.0"``); ``gcc`` is the C back-end ``nim c``
-    # shells out to and links through. ``gcc >=12`` matches the workspace
+    # ``requires "nim >= 2.0.0"``). The C compiler is the back-end
+    # ``nim c`` shells out to and links through: native Nim selects Clang
+    # on Darwin and GCC elsewhere, so declare the one it actually runs.
+    # Action-scoped tool selection keeps only the compilers a recipe
+    # declares, and with ``gcc`` alone every macOS compile action failed
+    # with "clang: command not found" (on macOS the six tests compile their
+    # Objective-C capture sources). ``gcc >=12`` matches the workspace
     # toolchain floor. Sufficient for the path-mode resolver under
     # ``nix develop``.
     #
@@ -183,7 +188,10 @@ package isonim_cocoa:
     # host-runnable ``else:``-arm tests. A macOS extraction — where the
     # AppKit corpus is in the graph — would add ``uses: "isonim"``.
     "nim >=2.0"
-    "gcc >=12"
+    when defined(macosx):
+      "clang"
+    else:
+      "gcc >=12"
 
   # Library declaration — the importable ``src/`` surface when this package
   # is consumed via ``uses: "isonim_cocoa"`` (e.g. the deferred cocoa-adapter
@@ -197,8 +205,9 @@ package isonim_cocoa:
   library isonim_cocoa
 
   build:
-    # Two-edge test template (Package-Model.md §"The test template"): one
-    # compile BUILD edge + one EXECUTE edge per host-runnable test file.
+    # Two-edge test template: one compile BUILD edge + one EXECUTE edge
+    # per host-runnable test file, so a compiled test is cached apart from
+    # its run.
     # BUILD halves collect into ``test-builds`` (compile verification);
     # EXECUTE halves into ``test`` so ``repro test`` / ``repro build test``
     # materialise the runnable closure (each execute edge transitively
