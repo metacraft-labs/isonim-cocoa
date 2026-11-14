@@ -51,32 +51,36 @@ build:
 # ─────────────────────────────────────────────────────────────────────────────
 # Nim tests (headless, no Xcode needed)
 # ─────────────────────────────────────────────────────────────────────────────
+#
+# Every `nim c -r` below writes its executable to `build/tests/` (ignored by
+# `.gitignore`). Without `--outdir` Nim puts it beside the source, so each run
+# left a `tests/test_*` binary in the worktree.
 
 # Run ObjC runtime tests (M0)
 test-objc:
-    nim c -r --nimcache:nimcache/test_objc_runtime tests/test_objc_runtime.nim
+    nim c -r --outdir:build/tests --nimcache:nimcache/test_objc_runtime tests/test_objc_runtime.nim
 
 # Run AppKit view tests (M1)
 test-views:
-    nim c -r --nimcache:nimcache/test_appkit_views tests/test_appkit_views.nim
+    nim c -r --outdir:build/tests --nimcache:nimcache/test_appkit_views tests/test_appkit_views.nim
 
 # Run renderer tests (M2)
 test-renderer:
-    nim c -r --nimcache:nimcache/test_renderer tests/test_renderer.nim
+    nim c -r --outdir:build/tests --nimcache:nimcache/test_renderer tests/test_renderer.nim
 
 # Run test infrastructure tests (FakeClock, snapshots)
 test-infra:
-    nim c -r --hints:off tests/test_nimcache_is_worktree_local.nim
-    nim c -r --nimcache:nimcache/test_fake_clock tests/test_fake_clock.nim
-    nim c -r --nimcache:nimcache/test_snapshots tests/test_snapshots.nim
+    nim c -r --outdir:build/tests --hints:off tests/test_nimcache_is_worktree_local.nim
+    nim c -r --outdir:build/tests --nimcache:nimcache/test_fake_clock tests/test_fake_clock.nim
+    nim c -r --outdir:build/tests --nimcache:nimcache/test_snapshots tests/test_snapshots.nim
 
 # Run cross-renderer tests (requires isonim core as sibling)
 test-cross:
-    nim c -r --path:../isonim/src --nimcache:nimcache/test_cross_renderer tests/test_cross_renderer.nim
+    nim c -r --outdir:build/tests --path:../isonim/src --nimcache:nimcache/test_cross_renderer tests/test_cross_renderer.nim
 
 # Render all branded scenario snapshots (creates/compares golden files)
 test-scenarios:
-    nim c -r --nimcache:nimcache/test_scenarios tests/test_scenario_snapshots.nim
+    nim c -r --outdir:build/tests --nimcache:nimcache/test_scenarios tests/test_scenario_snapshots.nim
 
 # Run all headless Nim tests
 test: test-objc test-views test-renderer test-infra
@@ -399,15 +403,19 @@ test-device: xcode-generate
 # Update all golden snapshots (run after intentional visual changes)
 snapshot-update:
     rm -rf tests/golden/*.png
-    nim c -r --nimcache:nimcache/test_snapshots tests/test_snapshots.nim
+    nim c -r --outdir:build/tests --nimcache:nimcache/test_snapshots tests/test_snapshots.nim
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Clean
 # ─────────────────────────────────────────────────────────────────────────────
 
+# Test executables live under build/, so `clean` no longer touches tests/.
+# The old `rm -rf tests/test_* !tests/test_*.nim` deleted the test SOURCES:
+# `!` is not a negation to `rm`, and the glob matched every `tests/test_*.nim`.
+
 # Clean all build artifacts
 clean:
-    rm -rf nimcache/ tests/test_* !tests/test_*.nim IsoNimCocoa.xcodeproj build/
+    rm -rf nimcache/ .nimcache/ IsoNimCocoa.xcodeproj build/
 
 # Clean only Nim build artifacts
 clean-nim:
