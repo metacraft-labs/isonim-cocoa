@@ -34,8 +34,11 @@
 ## per-file ``when defined(macosx)`` guards; it is NOT dropped or weakened,
 ## just absent on the wrong OS, and would be added by a macOS extraction.)
 ##
-## A Mode 1 / Mode 3 hybrid (per
-## ``reprobuild-specs/Three-Mode-Convention-System.md``) modelled on the
+## A Mode 1 / Mode 3 hybrid — reprobuild's conventions for describing a
+## project: in Mode 1 the directory layout is the manifest, in Mode 3 a small
+## hand-written ``repro.nim`` declares the rest (see
+## https://github.com/metacraft-labs/reprobuild/blob/dev/docs/user-guide/three-modes.md)
+## — modelled on the
 ## canonical ``runquota/repro.nim`` / ``codetracer-trace-format-nim/repro.nim``
 ## / ``nim-stackable-hooks/repro.nim`` / ``isonim-render-serve/repro.nim``
 ## recipes:
@@ -55,8 +58,10 @@
 ## * Emits, per HOST-RUNNABLE test file under ``tests/``, a BUILD edge
 ##   (``buildNimUnittest.build``) that compiles ``build/test-bin/<stem>``
 ##   and an EXECUTE edge (``edge.testBinary.run``) that runs it — the
-##   two-edge test template from ``reprobuild-specs/Package-Model.md``
-##   §"The test template". BUILD halves collect into ``test-builds``;
+##   two-edge test template: compiling a test and running it are separate
+##   actions, so the compiled binary is cached on its sources and flags
+##   alone, and a re-run does not recompile. BUILD halves collect into
+##   ``test-builds``;
 ##   EXECUTE halves into ``test`` so ``repro build test`` / ``repro test``
 ##   materialise the runnable closure.
 ##

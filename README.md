@@ -143,7 +143,15 @@ The Task Manager demo lives in
 canonical shared core (`task_app/core/{vm,views}.nim`) is consumed by
 the TUI / web / GPUI / Freya / Cocoa flavours from a single source.
 
-## Specs
+## Related projects
 
-- Cross-platform architecture: [`codetracer-specs/Front-Ends/IsoNim/isonim-cross-platform-architecture.md`](../codetracer-specs/Front-Ends/IsoNim/isonim-cross-platform-architecture.md).
-- Render-streaming milestones: [`codetracer-specs/Front-Ends/IsoNim/isonim-render-stream.status.org`](../codetracer-specs/Front-Ends/IsoNim/isonim-render-stream.status.org).
+- [IsoNim](https://github.com/metacraft-labs/isonim) defines the
+  `RendererBackend` interface this repository implements. Every renderer
+  (TUI, web, GPUI, Freya, Cocoa) implements the same interface, so one
+  view tree drives each of them; see the [Architecture](#architecture)
+  section above for how the Cocoa renderer maps it onto AppKit and UIKit.
+- Render streaming: the `IsoNim-Stream` Xcode target (`ios-app/StreamSources/`,
+  `just deploy-stream`) runs the branded UI on an iPhone and serves its
+  rendered frames over TCP port 8200, advertised over Bonjour as
+  `_isonim-stream._tcp.`; `just test-stream-frame ip=<ip>` checks the
+  first frame.
