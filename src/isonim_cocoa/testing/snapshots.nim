@@ -19,6 +19,13 @@ proc nim_capture_view_png(view: Id; width, height: cint;
 # Default directory for golden snapshot files
 var goldenDir* = "tests/golden"
 
+# Where `compareSnapshot` writes the captured PNG when it does not match its
+# golden file, as `<actualDir>/<name>.png`. CI uploads this directory when a
+# job fails, so a mismatch on another Mac can be inspected without access to
+# that host. Relative to the working directory, like `goldenDir`; the
+# Justfile recipes run from the repository root, where `build/` is ignored.
+var actualDir* = "build/snapshot-actual"
+
 type
   SnapshotResult* = object
     matched*: bool
@@ -108,9 +115,17 @@ proc comparePngBytes*(actual, expected: seq[byte];
 proc snapshotPath*(name: string): string =
   goldenDir / name & ".png"
 
+proc actualPath*(name: string): string =
+  ## Where a mismatching capture of snapshot `name` is written.
+  actualDir / name & ".png"
+
 proc compareSnapshot*(view: Id; name: string;
                        width: int = 200; height: int = 100;
                        tolerance: float64 = 0.0): SnapshotResult =
+  ## Capture `view` and compare it with the golden file `name`. A missing
+  ## golden is created and counts as a match. On a mismatch the capture is
+  ## also written to `actualPath(name)` and the message names both files;
+  ## the comparison itself is unchanged.
   let actual = captureViewToPng(view, width, height)
   let path = snapshotPath(name)
 
@@ -120,17 +135,16 @@ proc compareSnapshot*(view: Id; name: string;
       message: "Golden file created: " & path)
 
   let expected = loadPng(path)
-  comparePngBytes(actual, expected, tolerance)
+  result = comparePngBytes(actual, expected, tolerance)
+  if not result.matched and actual.len > 0:
+    let saved = actualPath(name)
+    savePng(actual, saved)
+    result.message.add("\n  Golden: " & path & "\n  Actual: " & saved)
 
 proc assertSnapshot*(view: Id; name: string;
                       width: int = 200; height: int = 100;
                       tolerance: float64 = 0.0) =
   let result = compareSnapshot(view, name, width, height, tolerance)
   if not result.matched:
-    let actual = captureViewToPng(view, width, height)
-    let actualPath = snapshotPath(name & ".actual")
-    savePng(actual, actualPath)
     raise newException(AssertionDefect,
-      "Snapshot mismatch for '" & name & "': " & result.message &
-      "\n  Golden: " & snapshotPath(name) &
-      "\n  Actual: " & actualPath)
+      "Snapshot mismatch for '" & name & "': " & result.message)
