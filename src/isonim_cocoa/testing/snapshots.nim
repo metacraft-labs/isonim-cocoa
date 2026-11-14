@@ -13,8 +13,13 @@ import isonim_cocoa/objc_runtime
 {.compile: currentSourcePath()[0..^(len("snapshots.nim") + 1)] & "snapshot_helper.m".}
 
 proc nim_capture_view_png(view: Id; width, height: cint;
-                           buf: pointer; bufLen: clong): clong
+                           outBuf: ptr pointer): clong
   {.importc, cdecl.}
+  ## Captures `view` once. On success returns the PNG's length and stores a
+  ## `malloc`ed copy of it in `outBuf`, which the caller must `free`. On
+  ## failure returns 0 and stores nil.
+
+proc cFree(p: pointer) {.importc: "free", header: "<stdlib.h>".}
 
 # Default directory for golden snapshot files
 var goldenDir* = "tests/golden"
@@ -39,13 +44,23 @@ type
 # ---------------------------------------------------------------------------
 
 proc captureViewToPng*(view: Id; width, height: int): seq[byte] =
-  ## Render an NSView to a PNG byte sequence. No window needed.
-  let needed = nim_capture_view_png(view, cint(width), cint(height), nil, 0)
-  if needed <= 0:
+  ## Render an NSView to a PNG byte sequence. No window needed. Returns an
+  ## empty sequence when the capture fails.
+  ##
+  ## The view is captured exactly once and the PNG is copied whole. (An
+  ## earlier version captured twice, once to learn the length and once to
+  ## fill the buffer, and ignored the second length, so two captures of
+  ## different sizes would have returned a truncated or padded PNG.)
+  var png: pointer = nil
+  let len = nim_capture_view_png(view, cint(width), cint(height), addr png)
+  if len <= 0 or png == nil:
+    if png != nil: cFree(png)
     return @[]
-  result = newSeq[byte](needed)
-  discard nim_capture_view_png(view, cint(width), cint(height),
-                                addr result[0], needed)
+  try:
+    result = newSeq[byte](len)
+    copyMem(addr result[0], png, len)
+  finally:
+    cFree(png)
 
 proc captureViewToPng*(view: Id): seq[byte] =
   ## Capture using default 200x100 size.

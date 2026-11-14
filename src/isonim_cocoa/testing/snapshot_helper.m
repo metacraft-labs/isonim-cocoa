@@ -29,11 +29,17 @@
 // drawing. (-[CALayer renderInContext:] was tried and produced blank images.)
 
 #import <AppKit/AppKit.h>
+#include <stdlib.h>
 
 static const NSInteger kSnapshotPixelsPerPoint = 2;
 
+// Capture `view` once as a PNG. On success returns its length and stores a
+// malloc'ed copy in *out, which the caller frees with free(). On failure
+// returns 0 and stores NULL.
 long nim_capture_view_png(id view, int width, int height,
-                          unsigned char *buf, long bufLen) {
+                          unsigned char **out) {
+    if (out == NULL) return 0;
+    *out = NULL;
     @autoreleasepool {
         NSView *v = (NSView *)view;
         NSAppearance *aqua = [NSAppearance appearanceNamed:NSAppearanceNameAqua];
@@ -79,9 +85,11 @@ long nim_capture_view_png(id view, int width, int height,
         NSData *png = [bmp representationUsingType:NSBitmapImageFileTypePNG
                                         properties:@{}];
         long len = (long)[png length];
-        if (buf != NULL && bufLen >= len) {
-            memcpy(buf, [png bytes], len);
-        }
+        if (png == nil || len <= 0) return 0;
+        unsigned char *copy = malloc((size_t)len);
+        if (copy == NULL) return 0;
+        memcpy(copy, [png bytes], (size_t)len);
+        *out = copy;
         return len;
     }
 }
